@@ -18,6 +18,9 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/Adembc/lazyssh/internal/core/domain"
 )
@@ -72,9 +75,48 @@ func (w *SSHConfigWriter) writeServer(writer *bufio.Writer, server domain.Server
 	}
 
 	if server.Key != "" {
-		if _, err := fmt.Fprintf(writer, "    IdentityFile %s\n", server.Key); err != nil {
+		// Convert absolute paths to relative paths for cross-platform portability
+		keyPath := w.toRelativePath(server.Key)
+		if _, err := fmt.Fprintf(writer, "    IdentityFile %s\n", keyPath); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// toRelativePath converts absolute paths to tilde-prefixed relative paths when possible
+func (w *SSHConfigWriter) toRelativePath(path string) string {
+	// Already a relative path, return as-is
+	if strings.HasPrefix(path, "~/") {
+		return path
+	}
+
+	// Get user's home directory
+	home, err := os.UserHomeDir()
+	if err != nil {
+		// Unable to get home directory, return original path
+		return path
+	}
+
+	// Clean paths for consistency
+	cleanPath := filepath.Clean(path)
+	cleanHome := filepath.Clean(home)
+
+	// Check if path is under home directory
+	if strings.HasPrefix(cleanPath, cleanHome) {
+		// Convert absolute path to relative
+		relPath := strings.TrimPrefix(cleanPath, cleanHome)
+		if relPath == "" {
+			return "~"
+		}
+		// Ensure forward slashes for cross-platform compatibility
+		relPath = filepath.ToSlash(relPath)
+		if !strings.HasPrefix(relPath, "/") {
+			relPath = "/" + relPath
+		}
+		return "~" + relPath
+	}
+
+	// Path is not under home directory, return original
+	return path
 }
