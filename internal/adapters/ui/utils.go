@@ -29,6 +29,10 @@ const (
 	sshNo    = "no"
 	sshForce = "force"
 	sshAuto  = "auto"
+
+	// SessionType values
+	sessionTypeNone      = "none"
+	sessionTypeSubsystem = "subsystem"
 )
 
 // renderTagBadgesForList renders up to two colored tag chips for the server list.
@@ -176,7 +180,12 @@ func BuildSSHCommand(s domain.Server) string {
 
 	// RemoteCommand (must come after the host)
 	if s.RemoteCommand != "" {
-		parts = append(parts, quoteIfNeeded(s.RemoteCommand))
+		// Handle special case: RemoteCommand=none clears the command (OpenSSH 7.6+)
+		if s.RemoteCommand == sessionTypeNone {
+			parts = append(parts, "-o", "RemoteCommand=none")
+		} else {
+			parts = append(parts, quoteIfNeeded(s.RemoteCommand))
+		}
 	}
 
 	return strings.Join(parts, " ")
@@ -379,6 +388,22 @@ func addTTYAndLoggingOptions(parts *[]string, s domain.Server) {
 	// BatchMode option
 	if s.BatchMode == sshYes {
 		*parts = append(*parts, "-o", "BatchMode=yes")
+	}
+
+	// SessionType option (OpenSSH 8.7+)
+	// "none" is equivalent to -N flag
+	if s.SessionType != "" {
+		switch s.SessionType {
+		case sessionTypeNone:
+			// Use -N flag for better compatibility
+			*parts = append(*parts, "-N")
+		case sessionTypeSubsystem:
+			// Use -s flag for subsystem
+			*parts = append(*parts, "-s")
+		default:
+			// For other values, use -o SessionType=
+			*parts = append(*parts, "-o", fmt.Sprintf("SessionType=%s", s.SessionType))
+		}
 	}
 }
 

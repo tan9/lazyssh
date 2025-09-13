@@ -34,6 +34,7 @@ type Server struct {
 	ProxyCommand       string
 	RemoteCommand      string
 	RequestTTY         string
+	SessionType        string // none, subsystem, default (OpenSSH 8.7+)
 	ConnectTimeout     string
 	ConnectionAttempts string
 	BindAddress        string

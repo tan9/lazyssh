@@ -97,6 +97,7 @@ func (sd *ServerDetails) UpdateServer(server domain.Server) {
 				{"ProxyCommand", server.ProxyCommand},
 				{"RemoteCommand", server.RemoteCommand},
 				{"RequestTTY", server.RequestTTY},
+				{"SessionType", server.SessionType},
 				{"ConnectTimeout", server.ConnectTimeout},
 				{"ConnectionAttempts", server.ConnectionAttempts},
 				{"BindAddress", server.BindAddress},

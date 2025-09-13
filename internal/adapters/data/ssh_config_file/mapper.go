@@ -121,6 +121,8 @@ func (r *Repository) mapConnectionConfig(server *domain.Server, key, value strin
 		server.RemoteCommand = value
 	case "requesttty":
 		server.RequestTTY = value
+	case "sessiontype":
+		server.SessionType = value
 	case "connecttimeout":
 		server.ConnectTimeout = value
 	case "connectionattempts":

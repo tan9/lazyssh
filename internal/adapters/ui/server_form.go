@@ -61,8 +61,9 @@ var sshDefaults = map[string]string{
 	"BatchMode":             "no",
 
 	// Other
-	"RequestTTY": "auto",
-	"LogLevel":   "INFO",
+	"RequestTTY":  "auto",
+	"SessionType": "default",
+	"LogLevel":    "INFO",
 }
 
 type ServerFormMode int
@@ -74,6 +75,9 @@ const (
 
 const (
 	tabSeparator = "[gray]|[-] " // Tab separator with gray color
+
+	// SessionType values (sessionTypeNone and sessionTypeSubsystem are in utils.go)
+	sessionTypeDefault = "default"
 )
 
 type ServerForm struct {
@@ -529,12 +533,24 @@ func (sf *ServerForm) findOptionIndex(options []string, value string) int {
 		}
 	}
 
-	// Look for exact match
+	// Look for exact match first
 	for i, opt := range options {
 		if strings.EqualFold(opt, value) {
 			return i
 		}
 	}
+
+	// Then look for options with descriptions (e.g., "none (-N)" matches "none")
+	for i, opt := range options {
+		// Extract the base value from options like "none (-N)"
+		if spaceIdx := strings.Index(opt, " "); spaceIdx > 0 {
+			baseOpt := opt[:spaceIdx]
+			if strings.EqualFold(baseOpt, value) {
+				return i
+			}
+		}
+	}
+
 	return 0 // Default to first option
 }
 
@@ -627,6 +643,7 @@ func (sf *ServerForm) getDefaultValues() ServerFormData {
 			ProxyCommand:                sf.original.ProxyCommand,
 			RemoteCommand:               sf.original.RemoteCommand,
 			RequestTTY:                  sf.original.RequestTTY,
+			SessionType:                 sf.original.SessionType,
 			ConnectTimeout:              sf.original.ConnectTimeout,
 			ConnectionAttempts:          sf.original.ConnectionAttempts,
 			BindAddress:                 sf.original.BindAddress,
@@ -715,12 +732,22 @@ func (sf *ServerForm) createConnectionForm() {
 	form.AddTextView("[yellow]Proxy & Command[-]", "", 0, 1, true, false)
 	form.AddInputField("ProxyJump:", defaultValues.ProxyJump, 40, nil, nil)
 	form.AddInputField("ProxyCommand:", defaultValues.ProxyCommand, 40, nil, nil)
-	form.AddInputField("RemoteCommand:", defaultValues.RemoteCommand, 40, nil, nil)
+	remoteCommandField := tview.NewInputField().
+		SetLabel("RemoteCommand:").
+		SetText(defaultValues.RemoteCommand).
+		SetFieldWidth(40).
+		SetPlaceholder("command to run, or 'none' to clear (OpenSSH 7.6+)")
+	form.AddFormItem(remoteCommandField)
 
 	// RequestTTY dropdown
 	requestTTYOptions := createOptionsWithDefault("RequestTTY", []string{"", "yes", "no", "force", "auto"})
 	requestTTYIndex := sf.findOptionIndex(requestTTYOptions, defaultValues.RequestTTY)
 	form.AddDropDown("RequestTTY:", requestTTYOptions, requestTTYIndex, nil)
+
+	// SessionType dropdown (OpenSSH 8.7+)
+	sessionTypeOptions := createOptionsWithDefault("SessionType", []string{"", "none (-N)", "subsystem (-s)", "default"})
+	sessionTypeIndex := sf.findOptionIndex(sessionTypeOptions, defaultValues.SessionType)
+	form.AddDropDown("SessionType:", sessionTypeOptions, sessionTypeIndex, nil)
 
 	form.AddTextView("[yellow]Connection Settings[-]", "", 0, 1, true, false)
 	connectTimeoutField := tview.NewInputField().
@@ -1056,6 +1083,7 @@ type ServerFormData struct {
 	ProxyCommand       string
 	RemoteCommand      string
 	RequestTTY         string
+	SessionType        string
 	ConnectTimeout     string
 	ConnectionAttempts string
 	BindAddress        string
@@ -1158,6 +1186,7 @@ func (sf *ServerForm) getFormData() ServerFormData {
 		ProxyCommand:       getFieldText("ProxyCommand:"),
 		RemoteCommand:      getFieldText("RemoteCommand:"),
 		RequestTTY:         getDropdownValue("RequestTTY:"),
+		SessionType:        sf.parseSessionType(getDropdownValue("SessionType:")),
 		ConnectTimeout:     getFieldText("ConnectTimeout:"),
 		ConnectionAttempts: getFieldText("ConnectionAttempts:"),
 		BindAddress:        getFieldText("BindAddress:"),
@@ -1203,6 +1232,26 @@ func (sf *ServerForm) getFormData() ServerFormData {
 		// Debugging settings
 		LogLevel:  getDropdownValue("LogLevel:"),
 		BatchMode: getDropdownValue("BatchMode:"),
+	}
+}
+
+// parseSessionType converts dropdown display value to actual value
+func (sf *ServerForm) parseSessionType(value string) string {
+	// First handle the default value format
+	if strings.HasPrefix(value, "default (") && strings.HasSuffix(value, ")") {
+		return "" // Return empty string for default values
+	}
+
+	// Then handle specific display values
+	switch value {
+	case "none (-N)":
+		return sessionTypeNone
+	case "subsystem (-s)":
+		return sessionTypeSubsystem
+	case "default":
+		return sessionTypeDefault
+	default:
+		return value
 	}
 }
 
@@ -1483,6 +1532,7 @@ func (sf *ServerForm) dataToServer(data ServerFormData) domain.Server {
 		ProxyCommand:                data.ProxyCommand,
 		RemoteCommand:               data.RemoteCommand,
 		RequestTTY:                  data.RequestTTY,
+		SessionType:                 data.SessionType,
 		ConnectTimeout:              data.ConnectTimeout,
 		ConnectionAttempts:          data.ConnectionAttempts,
 		BindAddress:                 data.BindAddress,
