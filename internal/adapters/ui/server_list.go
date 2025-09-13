@@ -56,6 +56,13 @@ func (sl *ServerList) build() {
 }
 
 func (sl *ServerList) UpdateServers(servers []domain.Server) {
+	// Save current selection before clearing
+	currentIdx := sl.List.GetCurrentItem()
+	var currentAlias string
+	if currentIdx >= 0 && currentIdx < len(sl.servers) {
+		currentAlias = sl.servers[currentIdx].Alias
+	}
+
 	sl.servers = servers
 	sl.List.Clear()
 
@@ -63,6 +70,7 @@ func (sl *ServerList) UpdateServers(servers []domain.Server) {
 	_, _, width, _ := sl.List.GetInnerRect() //nolint:dogsled
 	sl.currentWidth = width
 
+	newSelectedIdx := -1
 	for i := range servers {
 		primary, secondary := formatServerLine(servers[i], width)
 		idx := i
@@ -71,12 +79,24 @@ func (sl *ServerList) UpdateServers(servers []domain.Server) {
 				sl.onSelection(sl.servers[idx])
 			}
 		})
+		// Track the new index of previously selected server
+		if currentAlias != "" && servers[i].Alias == currentAlias {
+			newSelectedIdx = i
+		}
 	}
 
 	if sl.List.GetItemCount() > 0 {
-		sl.List.SetCurrentItem(0)
-		if sl.onSelectionChange != nil {
-			sl.onSelectionChange(sl.servers[0])
+		// Restore previous selection if found, otherwise keep first item
+		if newSelectedIdx >= 0 {
+			sl.List.SetCurrentItem(newSelectedIdx)
+			if sl.onSelectionChange != nil {
+				sl.onSelectionChange(sl.servers[newSelectedIdx])
+			}
+		} else {
+			sl.List.SetCurrentItem(0)
+			if sl.onSelectionChange != nil {
+				sl.onSelectionChange(sl.servers[0])
+			}
 		}
 	}
 }
