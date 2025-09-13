@@ -777,7 +777,7 @@ func (sf *ServerForm) createConnectionForm() {
 	form := tview.NewForm()
 	defaultValues := sf.getDefaultValues()
 
-	form.AddTextView("[yellow]Proxy & Command[-]", "", 0, 1, true, false)
+	form.AddTextView("\n[yellow]▶ Proxy & Command[-]", "", 0, 1, true, false)
 	form.AddInputField("ProxyJump:", defaultValues.ProxyJump, 40, nil, nil)
 	form.AddInputField("ProxyCommand:", defaultValues.ProxyCommand, 40, nil, nil)
 	remoteCommandField := tview.NewInputField().
@@ -797,7 +797,7 @@ func (sf *ServerForm) createConnectionForm() {
 	sessionTypeIndex := sf.findOptionIndex(sessionTypeOptions, defaultValues.SessionType)
 	form.AddDropDown("SessionType:", sessionTypeOptions, sessionTypeIndex, nil)
 
-	form.AddTextView("[yellow]Connection Settings[-]", "", 0, 1, true, false)
+	form.AddTextView("\n[yellow]▶ Connection Settings[-]", "", 0, 1, true, false)
 	connectTimeoutField := tview.NewInputField().
 		SetLabel("ConnectTimeout:").
 		SetText(defaultValues.ConnectTimeout).
@@ -812,7 +812,7 @@ func (sf *ServerForm) createConnectionForm() {
 		SetPlaceholder("default: 1")
 	form.AddFormItem(connectionAttemptsField)
 
-	form.AddTextView("[yellow]Bind Options[-]", "", 0, 1, true, false)
+	form.AddTextView("\n[yellow]▶ Bind Options[-]", "", 0, 1, true, false)
 	form.AddInputField("BindAddress:", defaultValues.BindAddress, 40, nil, nil)
 
 	// BindInterface dropdown with available network interfaces
@@ -833,7 +833,7 @@ func (sf *ServerForm) createConnectionForm() {
 		SetPlaceholder("default: af21 cs1")
 	form.AddFormItem(ipqosField)
 
-	form.AddTextView("[yellow]Hostname Canonicalization[-]", "", 0, 1, true, false)
+	form.AddTextView("\n[yellow]▶ Hostname Canonicalization[-]", "", 0, 1, true, false)
 
 	// CanonicalizeHostname dropdown
 	canonicalizeOptions := createOptionsWithDefault("CanonicalizeHostname", []string{"", "yes", "no", "always"})
@@ -859,7 +859,7 @@ func (sf *ServerForm) createConnectionForm() {
 		SetPlaceholder("default: 1")
 	form.AddFormItem(canonicalizeMaxDotsField)
 
-	form.AddTextView("[yellow]Keep-Alive[-]", "", 0, 1, true, false)
+	form.AddTextView("\n[yellow]▶ Keep-Alive[-]", "", 0, 1, true, false)
 	serverAliveIntervalField := tview.NewInputField().
 		SetLabel("ServerAliveInterval:").
 		SetText(defaultValues.ServerAliveInterval).
@@ -889,7 +889,7 @@ func (sf *ServerForm) createConnectionForm() {
 	batchModeIndex := sf.findOptionIndex(batchModeOptions, defaultValues.BatchMode)
 	form.AddDropDown("BatchMode:", batchModeOptions, batchModeIndex, nil)
 
-	form.AddTextView("[yellow]Multiplexing[-]", "", 0, 1, true, false)
+	form.AddTextView("\n[yellow]▶ Multiplexing[-]", "", 0, 1, true, false)
 	// ControlMaster dropdown
 	controlMasterOptions := createOptionsWithDefault("ControlMaster", []string{"", "yes", "no", "auto", "ask", "autoask"})
 	controlMasterIndex := sf.findOptionIndex(controlMasterOptions, defaultValues.ControlMaster)
@@ -913,7 +913,7 @@ func (sf *ServerForm) createForwardingForm() {
 	form := tview.NewForm()
 	defaultValues := sf.getDefaultValues()
 
-	form.AddTextView("[yellow]Port Forwarding[-]", "", 0, 1, true, false)
+	form.AddTextView("\n[yellow]▶ Port Forwarding[-]", "", 0, 1, true, false)
 	localForwardField := tview.NewInputField().
 		SetLabel("LocalForward:").
 		SetText(defaultValues.LocalForward).
@@ -950,7 +950,7 @@ func (sf *ServerForm) createForwardingForm() {
 	gatewayPortsIndex := sf.findOptionIndex(gatewayPortsOptions, defaultValues.GatewayPorts)
 	form.AddDropDown("GatewayPorts:", gatewayPortsOptions, gatewayPortsIndex, nil)
 
-	form.AddTextView("[yellow]Agent & X11 Forwarding[-]", "", 0, 1, true, false)
+	form.AddTextView("\n[yellow]▶ Agent & X11 Forwarding[-]", "", 0, 1, true, false)
 
 	// ForwardAgent dropdown
 	forwardAgentOptions := createOptionsWithDefault("ForwardAgent", []string{"", "yes", "no"})
@@ -1045,7 +1045,7 @@ func (sf *ServerForm) createAuthenticationForm() {
 	defaultValues := sf.getDefaultValues()
 
 	// Most common: Public key authentication
-	form.AddTextView("[yellow]Public Key Authentication[-]", "", 0, 1, true, false)
+	form.AddTextView("\n[yellow]▶ Public Key Authentication[-]", "", 0, 1, true, false)
 
 	// PubkeyAuthentication dropdown
 	pubkeyOptions := createOptionsWithDefault("PubkeyAuthentication", []string{"", "yes", "no"})
@@ -1058,7 +1058,7 @@ func (sf *ServerForm) createAuthenticationForm() {
 	form.AddDropDown("IdentitiesOnly:", identitiesOnlyOptions, identitiesOnlyIndex, nil)
 
 	// SSH Agent settings
-	form.AddTextView("[yellow]SSH Agent[-]", "", 0, 1, true, false)
+	form.AddTextView("\n[yellow]▶ SSH Agent[-]", "", 0, 1, true, false)
 
 	// AddKeysToAgent dropdown
 	addKeysOptions := createOptionsWithDefault("AddKeysToAgent", []string{"", "yes", "no", "ask", "confirm"})
@@ -1068,7 +1068,7 @@ func (sf *ServerForm) createAuthenticationForm() {
 	form.AddInputField("IdentityAgent:", defaultValues.IdentityAgent, 40, nil, nil)
 
 	// Password/Interactive authentication
-	form.AddTextView("[yellow]Password & Interactive[-]", "", 0, 1, true, false)
+	form.AddTextView("\n[yellow]▶ Password & Interactive[-]", "", 0, 1, true, false)
 
 	// PasswordAuthentication dropdown
 	passwordOptions := createOptionsWithDefault("PasswordAuthentication", []string{"", "yes", "no"})
@@ -1089,7 +1089,7 @@ func (sf *ServerForm) createAuthenticationForm() {
 	form.AddFormItem(passwordPromptsField)
 
 	// Advanced: Authentication order preference
-	form.AddTextView("[yellow]Advanced[-]", "", 0, 1, true, false)
+	form.AddTextView("\n[yellow]▶ Advanced[-]", "", 0, 1, true, false)
 
 	preferredAuthField := tview.NewInputField().
 		SetLabel("PreferredAuthentications:").
@@ -1114,7 +1114,7 @@ func (sf *ServerForm) createAdvancedForm() {
 	form := tview.NewForm()
 	defaultValues := sf.getDefaultValues()
 
-	form.AddTextView("[yellow]Security[-]", "", 0, 1, true, false)
+	form.AddTextView("\n[yellow]▶ Security[-]", "", 0, 1, true, false)
 
 	// StrictHostKeyChecking dropdown
 	strictHostKeyOptions := createOptionsWithDefault("StrictHostKeyChecking", []string{"", "yes", "no", "ask", "accept-new"})
@@ -1153,7 +1153,7 @@ func (sf *ServerForm) createAdvancedForm() {
 
 	form.AddInputField("UserKnownHostsFile:", defaultValues.UserKnownHostsFile, 40, nil, nil)
 
-	form.AddTextView("[yellow]Cryptography[-] [dim](+/-/^)[-]", "", 0, 1, true, false)
+	form.AddTextView("\n[yellow]▶ Cryptography[-] [dim](+/-/^)[-]", "", 0, 1, true, false)
 
 	// Ciphers with autocomplete support
 	form.AddInputField("Ciphers:", defaultValues.Ciphers, 40, nil, nil)
@@ -1203,7 +1203,7 @@ func (sf *ServerForm) createAdvancedForm() {
 		}
 	}
 
-	form.AddTextView("[yellow]Command Execution[-]", "", 0, 1, true, false)
+	form.AddTextView("\n[yellow]▶ Command Execution[-]", "", 0, 1, true, false)
 	form.AddInputField("LocalCommand:", defaultValues.LocalCommand, 40, nil, nil)
 
 	// PermitLocalCommand dropdown
@@ -1219,7 +1219,7 @@ func (sf *ServerForm) createAdvancedForm() {
 		SetPlaceholder("default: ~")
 	form.AddFormItem(escapeCharField)
 
-	form.AddTextView("[yellow]Environment[-]", "", 0, 1, true, false)
+	form.AddTextView("\n[yellow]▶ Environment[-]", "", 0, 1, true, false)
 	sendEnvField := tview.NewInputField().
 		SetLabel("SendEnv:").
 		SetText(defaultValues.SendEnv).
@@ -1234,7 +1234,7 @@ func (sf *ServerForm) createAdvancedForm() {
 		SetPlaceholder("e.g., FOO=bar, DEBUG=1")
 	form.AddFormItem(setEnvField)
 
-	form.AddTextView("[yellow]Debugging[-]", "", 0, 1, true, false)
+	form.AddTextView("\n[yellow]▶ Debugging[-]", "", 0, 1, true, false)
 
 	// LogLevel dropdown
 	logLevelOptions := createOptionsWithDefault("LogLevel", []string{"", "QUIET", "FATAL", "ERROR", "INFO", "VERBOSE", "DEBUG", "DEBUG1", "DEBUG2", "DEBUG3"})
