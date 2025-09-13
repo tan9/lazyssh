@@ -218,6 +218,25 @@ func addConnectionTimingOptions(parts *[]string, s domain.Server) {
 	if s.AddressFamily != "" {
 		*parts = append(*parts, "-o", fmt.Sprintf("AddressFamily=%s", s.AddressFamily))
 	}
+	if s.IPQoS != "" {
+		*parts = append(*parts, "-o", fmt.Sprintf("IPQoS=%s", s.IPQoS))
+	}
+	// Hostname canonicalization options
+	if s.CanonicalizeHostname != "" {
+		*parts = append(*parts, "-o", fmt.Sprintf("CanonicalizeHostname=%s", s.CanonicalizeHostname))
+	}
+	if s.CanonicalDomains != "" {
+		*parts = append(*parts, "-o", fmt.Sprintf("CanonicalDomains=%s", s.CanonicalDomains))
+	}
+	if s.CanonicalizeFallbackLocal != "" {
+		*parts = append(*parts, "-o", fmt.Sprintf("CanonicalizeFallbackLocal=%s", s.CanonicalizeFallbackLocal))
+	}
+	if s.CanonicalizeMaxDots != "" {
+		*parts = append(*parts, "-o", fmt.Sprintf("CanonicalizeMaxDots=%s", s.CanonicalizeMaxDots))
+	}
+	if s.CanonicalizePermittedCNAMEs != "" {
+		*parts = append(*parts, "-o", fmt.Sprintf("CanonicalizePermittedCNAMEs=%s", quoteIfNeeded(s.CanonicalizePermittedCNAMEs)))
+	}
 }
 
 // addPortForwardingOptions adds port forwarding options to the SSH command
@@ -236,6 +255,9 @@ func addPortForwardingOptions(parts *[]string, s domain.Server) {
 	}
 	if s.ExitOnForwardFailure == sshYes {
 		*parts = append(*parts, "-o", "ExitOnForwardFailure=yes")
+	}
+	if s.GatewayPorts != "" {
+		*parts = append(*parts, "-o", fmt.Sprintf("GatewayPorts=%s", s.GatewayPorts))
 	}
 }
 
@@ -347,6 +369,12 @@ func addEnvironmentOptions(parts *[]string, s domain.Server) {
 func addSecurityOptions(parts *[]string, s domain.Server) {
 	if s.StrictHostKeyChecking != "" {
 		*parts = append(*parts, "-o", fmt.Sprintf("StrictHostKeyChecking=%s", s.StrictHostKeyChecking))
+	}
+	if s.CheckHostIP != "" {
+		*parts = append(*parts, "-o", fmt.Sprintf("CheckHostIP=%s", s.CheckHostIP))
+	}
+	if s.FingerprintHash != "" {
+		*parts = append(*parts, "-o", fmt.Sprintf("FingerprintHash=%s", s.FingerprintHash))
 	}
 	if s.UserKnownHostsFile != "" {
 		*parts = append(*parts, "-o", fmt.Sprintf("UserKnownHostsFile=%s", quoteIfNeeded(s.UserKnownHostsFile)))

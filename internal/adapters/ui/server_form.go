@@ -31,15 +31,19 @@ import (
 // Based on OpenSSH defaults (version 8.x+)
 var sshDefaults = map[string]string{
 	// Connection settings
-	"Port":                 "22",
-	"ConnectTimeout":       "none",
-	"ConnectionAttempts":   "1",
-	"TCPKeepAlive":         "yes",
-	"ServerAliveInterval":  "0",
-	"ServerAliveCountMax":  "3",
-	"Compression":          "no",
-	"AddressFamily":        "any",
-	"ExitOnForwardFailure": "no",
+	"Port":                      "22",
+	"ConnectTimeout":            "none",
+	"ConnectionAttempts":        "1",
+	"TCPKeepAlive":              "yes",
+	"ServerAliveInterval":       "0",
+	"ServerAliveCountMax":       "3",
+	"Compression":               "no",
+	"AddressFamily":             "any",
+	"ExitOnForwardFailure":      "no",
+	"IPQoS":                     "af21 cs1",
+	"CanonicalizeHostname":      "no",
+	"CanonicalizeFallbackLocal": "yes",
+	"CanonicalizeMaxDots":       "1",
 
 	// Authentication
 	"PubkeyAuthentication":         "yes",
@@ -54,6 +58,7 @@ var sshDefaults = map[string]string{
 	"ForwardX11":          "no",
 	"ForwardX11Trusted":   "no",
 	"ClearAllForwardings": "no",
+	"GatewayPorts":        "no",
 
 	// Multiplexing
 	"ControlMaster":  "no",
@@ -62,6 +67,8 @@ var sshDefaults = map[string]string{
 
 	// Security
 	"StrictHostKeyChecking": "ask",
+	"CheckHostIP":           "no",
+	"FingerprintHash":       "SHA256",
 	"PermitLocalCommand":    "no",
 	"BatchMode":             "no",
 
@@ -808,6 +815,40 @@ func (sf *ServerForm) createConnectionForm() {
 	addressFamilyIndex := sf.findOptionIndex(addressFamilyOptions, defaultValues.AddressFamily)
 	form.AddDropDown("AddressFamily:", addressFamilyOptions, addressFamilyIndex, nil)
 
+	// IPQoS field
+	ipqosField := tview.NewInputField().
+		SetLabel("IPQoS:").
+		SetText(defaultValues.IPQoS).
+		SetFieldWidth(20).
+		SetPlaceholder("default: af21 cs1")
+	form.AddFormItem(ipqosField)
+
+	form.AddTextView("[yellow]Hostname Canonicalization[-]", "", 0, 1, true, false)
+
+	// CanonicalizeHostname dropdown
+	canonicalizeOptions := createOptionsWithDefault("CanonicalizeHostname", []string{"", "yes", "no", "always"})
+	canonicalizeIndex := sf.findOptionIndex(canonicalizeOptions, defaultValues.CanonicalizeHostname)
+	form.AddDropDown("CanonicalizeHostname:", canonicalizeOptions, canonicalizeIndex, nil)
+
+	canonicalDomainsField := tview.NewInputField().
+		SetLabel("CanonicalDomains:").
+		SetText(defaultValues.CanonicalDomains).
+		SetFieldWidth(40).
+		SetPlaceholder("e.g., example.com, internal.net")
+	form.AddFormItem(canonicalDomainsField)
+
+	// CanonicalizeFallbackLocal dropdown
+	fallbackOptions := createOptionsWithDefault("CanonicalizeFallbackLocal", []string{"", "yes", "no"})
+	fallbackIndex := sf.findOptionIndex(fallbackOptions, defaultValues.CanonicalizeFallbackLocal)
+	form.AddDropDown("CanonicalizeFallbackLocal:", fallbackOptions, fallbackIndex, nil)
+
+	canonicalizeMaxDotsField := tview.NewInputField().
+		SetLabel("CanonicalizeMaxDots:").
+		SetText(defaultValues.CanonicalizeMaxDots).
+		SetFieldWidth(10).
+		SetPlaceholder("default: 1")
+	form.AddFormItem(canonicalizeMaxDotsField)
+
 	form.AddTextView("[yellow]Keep-Alive[-]", "", 0, 1, true, false)
 	serverAliveIntervalField := tview.NewInputField().
 		SetLabel("ServerAliveInterval:").
@@ -888,6 +929,11 @@ func (sf *ServerForm) createForwardingForm() {
 	exitOnForwardFailureOptions := createOptionsWithDefault("ExitOnForwardFailure", []string{"", "yes", "no"})
 	exitOnForwardFailureIndex := sf.findOptionIndex(exitOnForwardFailureOptions, defaultValues.ExitOnForwardFailure)
 	form.AddDropDown("ExitOnForwardFailure:", exitOnForwardFailureOptions, exitOnForwardFailureIndex, nil)
+
+	// GatewayPorts dropdown
+	gatewayPortsOptions := createOptionsWithDefault("GatewayPorts", []string{"", "yes", "no", "clientspecified"})
+	gatewayPortsIndex := sf.findOptionIndex(gatewayPortsOptions, defaultValues.GatewayPorts)
+	form.AddDropDown("GatewayPorts:", gatewayPortsOptions, gatewayPortsIndex, nil)
 
 	form.AddTextView("[yellow]Agent & X11 Forwarding[-]", "", 0, 1, true, false)
 
@@ -1060,6 +1106,16 @@ func (sf *ServerForm) createAdvancedForm() {
 	strictHostKeyIndex := sf.findOptionIndex(strictHostKeyOptions, defaultValues.StrictHostKeyChecking)
 	form.AddDropDown("StrictHostKeyChecking:", strictHostKeyOptions, strictHostKeyIndex, nil)
 
+	// CheckHostIP dropdown
+	checkHostIPOptions := createOptionsWithDefault("CheckHostIP", []string{"", "yes", "no"})
+	checkHostIPIndex := sf.findOptionIndex(checkHostIPOptions, defaultValues.CheckHostIP)
+	form.AddDropDown("CheckHostIP:", checkHostIPOptions, checkHostIPIndex, nil)
+
+	// FingerprintHash dropdown
+	fingerprintHashOptions := createOptionsWithDefault("FingerprintHash", []string{"", "md5", "sha256"})
+	fingerprintHashIndex := sf.findOptionIndex(fingerprintHashOptions, defaultValues.FingerprintHash)
+	form.AddDropDown("FingerprintHash:", fingerprintHashOptions, fingerprintHashIndex, nil)
+
 	form.AddInputField("UserKnownHostsFile:", defaultValues.UserKnownHostsFile, 40, nil, nil)
 
 	form.AddTextView("[yellow]Cryptography[-] [dim](+/-/^)[-]", "", 0, 1, true, false)
@@ -1178,12 +1234,20 @@ type ServerFormData struct {
 	BindInterface        string
 	AddressFamily        string
 	ExitOnForwardFailure string
+	IPQoS                string
+	// Hostname canonicalization
+	CanonicalizeHostname        string
+	CanonicalDomains            string
+	CanonicalizeFallbackLocal   string
+	CanonicalizeMaxDots         string
+	CanonicalizePermittedCNAMEs string
 
 	// Port forwarding
 	LocalForward        string
 	RemoteForward       string
 	DynamicForward      string
 	ClearAllForwardings string
+	GatewayPorts        string
 
 	// Authentication and key management
 	// Public key
@@ -1217,6 +1281,8 @@ type ServerFormData struct {
 
 	// Security settings
 	StrictHostKeyChecking       string
+	CheckHostIP                 string
+	FingerprintHash             string
 	UserKnownHostsFile          string
 	HostKeyAlgorithms           string
 	PubkeyAcceptedAlgorithms    string

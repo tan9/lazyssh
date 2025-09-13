@@ -41,12 +41,20 @@ type Server struct {
 	BindInterface        string
 	AddressFamily        string // any, inet, inet6
 	ExitOnForwardFailure string // yes, no
+	IPQoS                string // af11, af12, af13, af21, af22, af23, af31, af32, af33, af41, af42, af43, cs0-cs7, ef, lowdelay, throughput, reliability, or numeric value
+	// Hostname canonicalization
+	CanonicalizeHostname        string // yes, no, always
+	CanonicalDomains            string
+	CanonicalizeFallbackLocal   string // yes, no
+	CanonicalizeMaxDots         string
+	CanonicalizePermittedCNAMEs string
 
 	// Port forwarding settings
 	LocalForward        []string
 	RemoteForward       []string
 	DynamicForward      []string
 	ClearAllForwardings string // yes, no
+	GatewayPorts        string // yes, no, clientspecified
 
 	// Authentication and key management
 	// Public key
@@ -82,6 +90,8 @@ type Server struct {
 
 	// Security and cryptography settings
 	StrictHostKeyChecking string
+	CheckHostIP           string // yes, no
+	FingerprintHash       string // md5, sha256
 	UserKnownHostsFile    string
 	HostKeyAlgorithms     string
 	MACs                  string

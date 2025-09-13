@@ -135,6 +135,18 @@ func (r *Repository) mapConnectionConfig(server *domain.Server, key, value strin
 		server.AddressFamily = value
 	case "exitonforwardfailure":
 		server.ExitOnForwardFailure = value
+	case "ipqos":
+		server.IPQoS = value
+	case "canonicalizehostname":
+		server.CanonicalizeHostname = value
+	case "canonicaldomains":
+		server.CanonicalDomains = value
+	case "canonicalizefallbacklocal":
+		server.CanonicalizeFallbackLocal = value
+	case "canonicalizemaxdots":
+		server.CanonicalizeMaxDots = value
+	case "canonicalizepermittedcnames":
+		server.CanonicalizePermittedCNAMEs = value
 	case "serveraliveinterval":
 		server.ServerAliveInterval = value
 	case "serveralivecountmax":
@@ -166,6 +178,8 @@ func (r *Repository) mapForwardingConfig(server *domain.Server, key, value strin
 		server.DynamicForward = append(server.DynamicForward, value)
 	case "clearallforwardings":
 		server.ClearAllForwardings = value
+	case "gatewayports":
+		server.GatewayPorts = value
 	case "forwardagent":
 		server.ForwardAgent = value
 	case "forwardx11":
@@ -215,6 +229,10 @@ func (r *Repository) mapSecurityConfig(server *domain.Server, key, value string)
 	switch key {
 	case "stricthostkeychecking":
 		server.StrictHostKeyChecking = value
+	case "checkhostip":
+		server.CheckHostIP = value
+	case "fingerprinthash":
+		server.FingerprintHash = value
 	case "userknownhostsfile":
 		server.UserKnownHostsFile = value
 	case "hostkeyalgorithms":
