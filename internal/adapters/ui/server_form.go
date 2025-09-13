@@ -672,10 +672,18 @@ func (sf *ServerForm) getDefaultValues() ServerFormData {
 			BindInterface:        sf.original.BindInterface,
 			AddressFamily:        sf.original.AddressFamily,
 			ExitOnForwardFailure: sf.original.ExitOnForwardFailure,
-			LocalForward:         strings.Join(sf.original.LocalForward, ", "),
-			RemoteForward:        strings.Join(sf.original.RemoteForward, ", "),
-			DynamicForward:       strings.Join(sf.original.DynamicForward, ", "),
-			ClearAllForwardings:  sf.original.ClearAllForwardings,
+			IPQoS:                sf.original.IPQoS,
+			// Hostname canonicalization
+			CanonicalizeHostname:        sf.original.CanonicalizeHostname,
+			CanonicalDomains:            sf.original.CanonicalDomains,
+			CanonicalizeFallbackLocal:   sf.original.CanonicalizeFallbackLocal,
+			CanonicalizeMaxDots:         sf.original.CanonicalizeMaxDots,
+			CanonicalizePermittedCNAMEs: sf.original.CanonicalizePermittedCNAMEs,
+			GatewayPorts:                sf.original.GatewayPorts,
+			LocalForward:                strings.Join(sf.original.LocalForward, ", "),
+			RemoteForward:               strings.Join(sf.original.RemoteForward, ", "),
+			DynamicForward:              strings.Join(sf.original.DynamicForward, ", "),
+			ClearAllForwardings:         sf.original.ClearAllForwardings,
 			// Public key
 			PubkeyAuthentication: sf.original.PubkeyAuthentication,
 			IdentitiesOnly:       sf.original.IdentitiesOnly,
@@ -812,6 +820,19 @@ func (sf *ServerForm) createConnectionForm() {
 		SetPlaceholder("default: 1")
 	form.AddFormItem(connectionAttemptsField)
 
+	// IPQoS field (moved from Bind Options)
+	ipqosField := tview.NewInputField().
+		SetLabel("IPQoS:").
+		SetText(defaultValues.IPQoS).
+		SetFieldWidth(20).
+		SetPlaceholder("default: af21 cs1")
+	form.AddFormItem(ipqosField)
+
+	// BatchMode dropdown (moved from Keep-Alive)
+	batchModeOptions := createOptionsWithDefault("BatchMode", []string{"", "yes", "no"})
+	batchModeIndex := sf.findOptionIndex(batchModeOptions, defaultValues.BatchMode)
+	form.AddDropDown("BatchMode:", batchModeOptions, batchModeIndex, nil)
+
 	form.AddTextView("\n[yellow]▶ Bind Options[-]", "", 0, 1, true, false)
 	form.AddInputField("BindAddress:", defaultValues.BindAddress, 40, nil, nil)
 
@@ -824,14 +845,6 @@ func (sf *ServerForm) createConnectionForm() {
 	addressFamilyOptions := createOptionsWithDefault("AddressFamily", []string{"", "any", "inet", "inet6"})
 	addressFamilyIndex := sf.findOptionIndex(addressFamilyOptions, defaultValues.AddressFamily)
 	form.AddDropDown("AddressFamily:", addressFamilyOptions, addressFamilyIndex, nil)
-
-	// IPQoS field
-	ipqosField := tview.NewInputField().
-		SetLabel("IPQoS:").
-		SetText(defaultValues.IPQoS).
-		SetFieldWidth(20).
-		SetPlaceholder("default: af21 cs1")
-	form.AddFormItem(ipqosField)
 
 	form.AddTextView("\n[yellow]▶ Hostname Canonicalization[-]", "", 0, 1, true, false)
 
@@ -859,6 +872,13 @@ func (sf *ServerForm) createConnectionForm() {
 		SetPlaceholder("default: 1")
 	form.AddFormItem(canonicalizeMaxDotsField)
 
+	canonicalizePermittedCNAMEsField := tview.NewInputField().
+		SetLabel("CanonicalizePermittedCNAMEs:").
+		SetText(defaultValues.CanonicalizePermittedCNAMEs).
+		SetFieldWidth(40).
+		SetPlaceholder("e.g., *.example.com:example.net")
+	form.AddFormItem(canonicalizePermittedCNAMEsField)
+
 	form.AddTextView("\n[yellow]▶ Keep-Alive[-]", "", 0, 1, true, false)
 	serverAliveIntervalField := tview.NewInputField().
 		SetLabel("ServerAliveInterval:").
@@ -883,11 +903,6 @@ func (sf *ServerForm) createConnectionForm() {
 	tcpKeepAliveOptions := createOptionsWithDefault("TCPKeepAlive", []string{"", "yes", "no"})
 	tcpKeepAliveIndex := sf.findOptionIndex(tcpKeepAliveOptions, defaultValues.TCPKeepAlive)
 	form.AddDropDown("TCPKeepAlive:", tcpKeepAliveOptions, tcpKeepAliveIndex, nil)
-
-	// BatchMode dropdown - disable all interactive prompts
-	batchModeOptions := createOptionsWithDefault("BatchMode", []string{"", "yes", "no"})
-	batchModeIndex := sf.findOptionIndex(batchModeOptions, defaultValues.BatchMode)
-	form.AddDropDown("BatchMode:", batchModeOptions, batchModeIndex, nil)
 
 	form.AddTextView("\n[yellow]▶ Multiplexing[-]", "", 0, 1, true, false)
 	// ControlMaster dropdown
@@ -1098,6 +1113,24 @@ func (sf *ServerForm) createAuthenticationForm() {
 		SetPlaceholder("e.g., publickey,password")
 	form.AddFormItem(preferredAuthField)
 
+	// PubkeyAcceptedAlgorithms with autocomplete support (moved from Advanced/Cryptography)
+	pubkeyAlgField := tview.NewInputField().
+		SetLabel("PubkeyAcceptedAlgorithms:").
+		SetText(defaultValues.PubkeyAcceptedAlgorithms).
+		SetFieldWidth(40).
+		SetPlaceholder("algorithms (+/-/^ prefix supported)")
+	pubkeyAlgField.SetAutocompleteFunc(sf.createAlgorithmAutocomplete(pubkeyAlgorithms))
+	form.AddFormItem(pubkeyAlgField)
+
+	// HostbasedAcceptedAlgorithms with autocomplete support (moved from Advanced/Cryptography)
+	hostbasedAlgField := tview.NewInputField().
+		SetLabel("HostbasedAcceptedAlgorithms:").
+		SetText(defaultValues.HostbasedAcceptedAlgorithms).
+		SetFieldWidth(40).
+		SetPlaceholder("algorithms (+/-/^ prefix supported)")
+	hostbasedAlgField.SetAutocompleteFunc(sf.createAlgorithmAutocomplete(pubkeyAlgorithms))
+	form.AddFormItem(hostbasedAlgField)
+
 	// Add save and cancel buttons
 	form.AddButton("Save", sf.handleSaveWrapper)
 	form.AddButton("Cancel", sf.handleCancel)
@@ -1153,55 +1186,43 @@ func (sf *ServerForm) createAdvancedForm() {
 
 	form.AddInputField("UserKnownHostsFile:", defaultValues.UserKnownHostsFile, 40, nil, nil)
 
-	form.AddTextView("\n[yellow]▶ Cryptography[-] [dim](+/-/^)[-]", "", 0, 1, true, false)
+	form.AddTextView("\n[yellow]▶ Cryptography[-]", "", 0, 1, true, false)
 
 	// Ciphers with autocomplete support
-	form.AddInputField("Ciphers:", defaultValues.Ciphers, 40, nil, nil)
-	if itemCount := form.GetFormItemCount(); itemCount > 0 {
-		if field, ok := form.GetFormItem(itemCount - 1).(*tview.InputField); ok {
-			field.SetAutocompleteFunc(sf.createAlgorithmAutocomplete(cipherAlgorithms))
-		}
-	}
+	ciphersField := tview.NewInputField().
+		SetLabel("Ciphers:").
+		SetText(defaultValues.Ciphers).
+		SetFieldWidth(40).
+		SetPlaceholder("algorithms (+/-/^ prefix supported)")
+	ciphersField.SetAutocompleteFunc(sf.createAlgorithmAutocomplete(cipherAlgorithms))
+	form.AddFormItem(ciphersField)
 
 	// MACs with autocomplete support
-	form.AddInputField("MACs:", defaultValues.MACs, 40, nil, nil)
-	if itemCount := form.GetFormItemCount(); itemCount > 0 {
-		if field, ok := form.GetFormItem(itemCount - 1).(*tview.InputField); ok {
-			field.SetAutocompleteFunc(sf.createAlgorithmAutocomplete(macAlgorithms))
-		}
-	}
+	macsField := tview.NewInputField().
+		SetLabel("MACs:").
+		SetText(defaultValues.MACs).
+		SetFieldWidth(40).
+		SetPlaceholder("algorithms (+/-/^ prefix supported)")
+	macsField.SetAutocompleteFunc(sf.createAlgorithmAutocomplete(macAlgorithms))
+	form.AddFormItem(macsField)
 
 	// KexAlgorithms with autocomplete support
-	form.AddInputField("KexAlgorithms:", defaultValues.KexAlgorithms, 40, nil, nil)
-	if itemCount := form.GetFormItemCount(); itemCount > 0 {
-		if field, ok := form.GetFormItem(itemCount - 1).(*tview.InputField); ok {
-			field.SetAutocompleteFunc(sf.createAlgorithmAutocomplete(kexAlgorithms))
-		}
-	}
+	kexField := tview.NewInputField().
+		SetLabel("KexAlgorithms:").
+		SetText(defaultValues.KexAlgorithms).
+		SetFieldWidth(40).
+		SetPlaceholder("algorithms (+/-/^ prefix supported)")
+	kexField.SetAutocompleteFunc(sf.createAlgorithmAutocomplete(kexAlgorithms))
+	form.AddFormItem(kexField)
 
 	// HostKeyAlgorithms with autocomplete support
-	form.AddInputField("HostKeyAlgorithms:", defaultValues.HostKeyAlgorithms, 40, nil, nil)
-	if itemCount := form.GetFormItemCount(); itemCount > 0 {
-		if field, ok := form.GetFormItem(itemCount - 1).(*tview.InputField); ok {
-			field.SetAutocompleteFunc(sf.createAlgorithmAutocomplete(hostKeyAlgorithms))
-		}
-	}
-
-	// PubkeyAcceptedAlgorithms with autocomplete support
-	form.AddInputField("PubkeyAcceptedAlgorithms:", defaultValues.PubkeyAcceptedAlgorithms, 40, nil, nil)
-	if itemCount := form.GetFormItemCount(); itemCount > 0 {
-		if field, ok := form.GetFormItem(itemCount - 1).(*tview.InputField); ok {
-			field.SetAutocompleteFunc(sf.createAlgorithmAutocomplete(pubkeyAlgorithms))
-		}
-	}
-
-	// HostbasedAcceptedAlgorithms with autocomplete support
-	form.AddInputField("HostbasedAcceptedAlgorithms:", defaultValues.HostbasedAcceptedAlgorithms, 40, nil, nil)
-	if itemCount := form.GetFormItemCount(); itemCount > 0 {
-		if field, ok := form.GetFormItem(itemCount - 1).(*tview.InputField); ok {
-			field.SetAutocompleteFunc(sf.createAlgorithmAutocomplete(pubkeyAlgorithms))
-		}
-	}
+	hostKeyField := tview.NewInputField().
+		SetLabel("HostKeyAlgorithms:").
+		SetText(defaultValues.HostKeyAlgorithms).
+		SetFieldWidth(40).
+		SetPlaceholder("algorithms (+/-/^ prefix supported)")
+	hostKeyField.SetAutocompleteFunc(sf.createAlgorithmAutocomplete(hostKeyAlgorithms))
+	form.AddFormItem(hostKeyField)
 
 	form.AddTextView("\n[yellow]▶ Command Execution[-]", "", 0, 1, true, false)
 	form.AddInputField("LocalCommand:", defaultValues.LocalCommand, 40, nil, nil)
