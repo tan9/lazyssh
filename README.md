@@ -34,10 +34,14 @@ With lazyssh, you can quickly navigate, connect, manage, and transfer files betw
 - 🌐 Proxy settings (ProxyJump, ProxyCommand).
 - ⚙️ Extensive SSH config options organized in tabbed interface.
 
+### Key Management
+- 🔑 SSH key autocomplete with automatic detection of available keys.
+- 📝 Smart key selection with support for multiple keys.
+
 
 ### Upcoming
 - 📁 Copy files between local and servers with an easy picker UI.
-- 🔑 Enhanced Key Management:
+- 🔑 SSH Key Deployment Features:
     - Use default local public key (`~/.ssh/id_ed25519.pub` or `~/.ssh/id_rsa.pub`)
     - Paste custom public keys manually
     - Generate new keypairs and deploy them
@@ -90,10 +94,10 @@ Fuzzy search functionality to quickly find servers by name, IP address, or tags
 
 Tabbed interface for managing SSH connections with extensive configuration options organized into:
 - **Basic** - Host, user, port, keys, tags
-- **Connection** - Proxy, timeouts, multiplexing
+- **Connection** - Proxy, timeouts, multiplexing, canonicalization
 - **Forwarding** - Port forwarding, X11, agent
-- **Authentication** - Keys, passwords, methods
-- **Advanced** - Security, cryptography, debugging
+- **Authentication** - Keys, passwords, methods, algorithm settings
+- **Advanced** - Security, cryptography, environment, debugging
 
 ---
 
