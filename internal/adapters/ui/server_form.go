@@ -506,7 +506,7 @@ func createOptionsWithDefault(fieldName string, baseOptions []string) []string {
 	options := make([]string, len(baseOptions))
 	for i, opt := range baseOptions {
 		if opt == "" {
-			options[i] = fmt.Sprintf("default (%s)", defaultValue)
+			options[i] = fmt.Sprintf("default [gray](%s)[-]", defaultValue)
 		} else {
 			options[i] = opt
 		}
@@ -514,8 +514,13 @@ func createOptionsWithDefault(fieldName string, baseOptions []string) []string {
 	return options
 }
 
-// parseOptionValue extracts the actual value from an option (handles "default (value)" format)
+// parseOptionValue extracts the actual value from an option (handles "default [gray](value)[-]" format)
 func parseOptionValue(option string) string {
+	// Check for colored default format
+	if strings.HasPrefix(option, "default [gray](") && strings.HasSuffix(option, ")[-]") {
+		return "" // Return empty string for default values
+	}
+	// Check for plain default format (backward compatibility)
 	if strings.HasPrefix(option, "default (") && strings.HasSuffix(option, ")") {
 		return "" // Return empty string for default values
 	}
@@ -524,10 +529,10 @@ func parseOptionValue(option string) string {
 
 // findOptionIndex finds the index of a value in options slice
 func (sf *ServerForm) findOptionIndex(options []string, value string) int {
-	// Empty value should match "default (...)" option
+	// Empty value should match "default [gray](...)[-]" or "default (...)" option
 	if value == "" {
 		for i, opt := range options {
-			if strings.HasPrefix(opt, "default (") {
+			if strings.HasPrefix(opt, "default [gray](") || strings.HasPrefix(opt, "default (") {
 				return i
 			}
 		}
