@@ -17,6 +17,7 @@ package ui
 import (
 	"fmt"
 	"net"
+	"os"
 	"reflect"
 	"regexp"
 	"strconv"
@@ -600,6 +601,83 @@ func matchesSequence(text, pattern string) bool {
 	return true
 }
 
+// createSSHKeyAutocomplete creates an autocomplete function for SSH key file paths
+func (sf *ServerForm) createSSHKeyAutocomplete() func(string) []string {
+	return func(currentText string) []string {
+		if currentText == "" {
+			// Show available keys when field is empty
+			availableKeys := GetAvailableSSHKeys()
+			if len(availableKeys) == 0 {
+				return nil
+			}
+			return availableKeys
+		}
+
+		// Split by comma to handle multiple keys
+		keys := strings.Split(currentText, ",")
+		lastKey := strings.TrimSpace(keys[len(keys)-1])
+
+		// If the last key is empty (after a comma and space), show all available keys
+		if lastKey == "" {
+			availableKeys := GetAvailableSSHKeys()
+			if len(availableKeys) == 0 {
+				return nil
+			}
+			// Build suggestions with existing keys
+			var suggestions []string
+			prefix := ""
+			if len(keys) > 1 {
+				// Join all keys except the last empty one
+				existingKeys := keys[:len(keys)-1]
+				for i := range existingKeys {
+					existingKeys[i] = strings.TrimSpace(existingKeys[i])
+				}
+				prefix = strings.Join(existingKeys, ", ") + ", "
+			}
+			for _, key := range availableKeys {
+				suggestions = append(suggestions, prefix+key)
+			}
+			return suggestions
+		}
+
+		// Get available keys and filter based on what's being typed
+		availableKeys := GetAvailableSSHKeys()
+		if len(availableKeys) == 0 {
+			return nil
+		}
+
+		// Convert to lowercase for case-insensitive matching
+		searchTerm := strings.ToLower(lastKey)
+
+		// Filter available keys
+		var filtered []string
+		prefix := ""
+		if len(keys) > 1 {
+			// Join all keys except the last one being typed
+			existingKeys := keys[:len(keys)-1]
+			for i := range existingKeys {
+				existingKeys[i] = strings.TrimSpace(existingKeys[i])
+			}
+			prefix = strings.Join(existingKeys, ", ") + ", "
+		}
+
+		for _, key := range availableKeys {
+			lowerKey := strings.ToLower(key)
+			// Check if the key matches the search term
+			if strings.Contains(lowerKey, searchTerm) || matchesSequence(lowerKey, searchTerm) {
+				filtered = append(filtered, prefix+key)
+			}
+		}
+
+		// If no matches found, return nil to allow Tab navigation
+		if len(filtered) == 0 {
+			return nil
+		}
+
+		return filtered
+	}
+}
+
 // createAlgorithmAutocomplete creates an autocomplete function for algorithm input fields
 func (sf *ServerForm) createAlgorithmAutocomplete(suggestions []string) func(string) []string {
 	return func(currentText string) []string {
@@ -727,10 +805,29 @@ func (sf *ServerForm) getDefaultValues() ServerFormData {
 			LogLevel:                    sf.original.LogLevel,
 		}
 	}
+	// Determine default key based on availability
+	defaultKey := "~/.ssh/id_ed25519"
+	availableKeys := GetAvailableSSHKeys()
+	if len(availableKeys) > 0 {
+		// Use the first available key as default
+		defaultKey = availableKeys[0]
+	} else {
+		// Check if id_ed25519 exists, otherwise try id_rsa
+		for _, key := range []string{"~/.ssh/id_ed25519", "~/.ssh/id_rsa"} {
+			if homeDir, err := os.UserHomeDir(); err == nil {
+				keyPath := strings.Replace(key, "~", homeDir, 1)
+				if _, err := os.Stat(keyPath); err == nil {
+					defaultKey = key
+					break
+				}
+			}
+		}
+	}
+
 	return ServerFormData{
 		User: "root",
 		Port: "22",
-		Key:  "~/.ssh/id_ed25519",
+		Key:  defaultKey,
 	}
 }
 
@@ -760,6 +857,7 @@ func (sf *ServerForm) createBasicForm() {
 		SetText(defaultValues.Key).
 		SetFieldWidth(40).
 		SetPlaceholder("e.g., ~/.ssh/id_rsa, ~/.ssh/id_ed25519")
+	keysField.SetAutocompleteFunc(sf.createSSHKeyAutocomplete())
 	form.AddFormItem(keysField)
 
 	tagsField := tview.NewInputField().

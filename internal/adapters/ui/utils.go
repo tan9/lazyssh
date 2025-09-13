@@ -16,6 +16,8 @@ package ui
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -469,4 +471,94 @@ func quoteIfNeeded(val string) string {
 		return fmt.Sprintf("%q", val)
 	}
 	return val
+}
+
+// GetAvailableSSHKeys returns a list of available SSH private key files in the user's .ssh directory.
+// It safely handles file permission issues and only returns readable key files.
+func GetAvailableSSHKeys() []string {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return []string{}
+	}
+
+	sshDir := filepath.Join(homeDir, ".ssh")
+	keys := []string{}
+
+	// Common SSH key filenames to look for
+	commonKeyFiles := []string{
+		"id_ed25519",
+		"id_rsa",
+		"id_ecdsa",
+		"id_dsa",
+		"id_ed25519_sk",
+		"id_ecdsa_sk",
+	}
+
+	// First, add common key files if they exist and are readable
+	for _, keyName := range commonKeyFiles {
+		keyPath := filepath.Join(sshDir, keyName)
+		if info, err := os.Stat(keyPath); err == nil && !info.IsDir() {
+			// Check if file is readable
+			// #nosec G304 - keyPath is constructed from known safe values
+			if file, err := os.Open(keyPath); err == nil {
+				_ = file.Close()
+				// Use tilde notation for user-friendly display
+				keys = append(keys, "~/.ssh/"+keyName)
+			}
+		}
+	}
+
+	// Additionally, scan for any other files that look like private keys
+	// (files without .pub extension and with appropriate permissions)
+	entries, err := os.ReadDir(sshDir)
+	if err != nil {
+		return keys // Return what we have so far
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+
+		name := entry.Name()
+		// Skip public keys, known_hosts, config, and authorized_keys
+		if strings.HasSuffix(name, ".pub") ||
+			name == "known_hosts" ||
+			name == "config" ||
+			name == "authorized_keys" ||
+			strings.HasPrefix(name, ".") {
+			continue
+		}
+
+		// Skip if already added as common key
+		isCommon := false
+		for _, commonKey := range commonKeyFiles {
+			if name == commonKey {
+				isCommon = true
+				break
+			}
+		}
+		if isCommon {
+			continue
+		}
+
+		// Check if file is readable and looks like a private key
+		keyPath := filepath.Join(sshDir, name)
+		// #nosec G304 - keyPath is constructed from safe directory enumeration
+		if file, err := os.Open(keyPath); err == nil {
+			// Read first few bytes to check if it might be a private key
+			buffer := make([]byte, 100)
+			n, readErr := file.Read(buffer)
+			_ = file.Close()
+			if readErr == nil && n > 0 {
+				content := string(buffer[:n])
+				if strings.Contains(content, "PRIVATE KEY") ||
+					strings.Contains(content, "SSH2 ENCRYPTED PRIVATE KEY") {
+					keys = append(keys, "~/.ssh/"+name)
+				}
+			}
+		}
+	}
+
+	return keys
 }
