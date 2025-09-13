@@ -102,6 +102,8 @@ func (sd *ServerDetails) UpdateServer(server domain.Server) {
 				{"ConnectionAttempts", server.ConnectionAttempts},
 				{"BindAddress", server.BindAddress},
 				{"BindInterface", server.BindInterface},
+				{"AddressFamily", server.AddressFamily},
+				{"ExitOnForwardFailure", server.ExitOnForwardFailure},
 				{"ServerAliveInterval", server.ServerAliveInterval},
 				{"ServerAliveCountMax", server.ServerAliveCountMax},
 				{"Compression", server.Compression},
@@ -122,6 +124,8 @@ func (sd *ServerDetails) UpdateServer(server domain.Server) {
 				{"IdentitiesOnly", server.IdentitiesOnly},
 				{"AddKeysToAgent", server.AddKeysToAgent},
 				{"IdentityAgent", server.IdentityAgent},
+				{"KbdInteractiveAuthentication", server.KbdInteractiveAuthentication},
+				{"NumberOfPasswordPrompts", server.NumberOfPasswordPrompts},
 			},
 		},
 		{
@@ -133,6 +137,7 @@ func (sd *ServerDetails) UpdateServer(server domain.Server) {
 				{"LocalForward", strings.Join(server.LocalForward, ", ")},
 				{"RemoteForward", strings.Join(server.RemoteForward, ", ")},
 				{"DynamicForward", strings.Join(server.DynamicForward, ", ")},
+				{"ClearAllForwardings", server.ClearAllForwardings},
 			},
 		},
 		{

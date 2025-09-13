@@ -30,30 +30,39 @@ type Server struct {
 
 	// Additional SSH config fields
 	// Connection and proxy settings
-	ProxyJump          string
-	ProxyCommand       string
-	RemoteCommand      string
-	RequestTTY         string
-	SessionType        string // none, subsystem, default (OpenSSH 8.7+)
-	ConnectTimeout     string
-	ConnectionAttempts string
-	BindAddress        string
-	BindInterface      string
+	ProxyJump            string
+	ProxyCommand         string
+	RemoteCommand        string
+	RequestTTY           string
+	SessionType          string // none, subsystem, default (OpenSSH 8.7+)
+	ConnectTimeout       string
+	ConnectionAttempts   string
+	BindAddress          string
+	BindInterface        string
+	AddressFamily        string // any, inet, inet6
+	ExitOnForwardFailure string // yes, no
 
 	// Port forwarding settings
-	LocalForward   []string
-	RemoteForward  []string
-	DynamicForward []string
+	LocalForward        []string
+	RemoteForward       []string
+	DynamicForward      []string
+	ClearAllForwardings string // yes, no
 
 	// Authentication and key management
+	// Public key
 	PubkeyAuthentication        string
 	PubkeyAcceptedAlgorithms    string
 	HostbasedAcceptedAlgorithms string
-	PasswordAuthentication      string
-	PreferredAuthentications    string
 	IdentitiesOnly              string
-	AddKeysToAgent              string
-	IdentityAgent               string
+	// SSH Agent
+	AddKeysToAgent string
+	IdentityAgent  string
+	// Password & Interactive
+	PasswordAuthentication       string
+	KbdInteractiveAuthentication string // yes, no
+	NumberOfPasswordPrompts      string
+	// Advanced
+	PreferredAuthentications string
 
 	// Agent and X11 forwarding
 	ForwardAgent      string

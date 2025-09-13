@@ -131,6 +131,10 @@ func (r *Repository) mapConnectionConfig(server *domain.Server, key, value strin
 		server.BindAddress = value
 	case "bindinterface":
 		server.BindInterface = value
+	case "addressfamily":
+		server.AddressFamily = value
+	case "exitonforwardfailure":
+		server.ExitOnForwardFailure = value
 	case "serveraliveinterval":
 		server.ServerAliveInterval = value
 	case "serveralivecountmax":
@@ -160,6 +164,8 @@ func (r *Repository) mapForwardingConfig(server *domain.Server, key, value strin
 		server.RemoteForward = append(server.RemoteForward, value)
 	case "dynamicforward":
 		server.DynamicForward = append(server.DynamicForward, value)
+	case "clearallforwardings":
+		server.ClearAllForwardings = value
 	case "forwardagent":
 		server.ForwardAgent = value
 	case "forwardx11":
@@ -193,6 +199,11 @@ func (r *Repository) mapAuthenticationConfig(server *domain.Server, key, value s
 		server.AddKeysToAgent = value
 	case "identityagent":
 		server.IdentityAgent = value
+	case "kbdinteractiveauthentication", "challengeresponseauthentication":
+		// ChallengeResponseAuthentication is deprecated alias for KbdInteractiveAuthentication
+		server.KbdInteractiveAuthentication = value
+	case "numberofpasswordprompts":
+		server.NumberOfPasswordPrompts = value
 	default:
 		return false
 	}

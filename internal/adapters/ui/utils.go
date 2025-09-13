@@ -215,6 +215,9 @@ func addConnectionTimingOptions(parts *[]string, s domain.Server) {
 	if s.BindInterface != "" {
 		*parts = append(*parts, "-B", s.BindInterface)
 	}
+	if s.AddressFamily != "" {
+		*parts = append(*parts, "-o", fmt.Sprintf("AddressFamily=%s", s.AddressFamily))
+	}
 }
 
 // addPortForwardingOptions adds port forwarding options to the SSH command
@@ -227,6 +230,12 @@ func addPortForwardingOptions(parts *[]string, s domain.Server) {
 	}
 	for _, forward := range s.DynamicForward {
 		*parts = append(*parts, "-D", forward)
+	}
+	if s.ClearAllForwardings == sshYes {
+		*parts = append(*parts, "-o", "ClearAllForwardings=yes")
+	}
+	if s.ExitOnForwardFailure == sshYes {
+		*parts = append(*parts, "-o", "ExitOnForwardFailure=yes")
 	}
 }
 
@@ -255,6 +264,12 @@ func addAuthOptions(parts *[]string, s domain.Server) {
 	}
 	if s.IdentityAgent != "" {
 		*parts = append(*parts, "-o", fmt.Sprintf("IdentityAgent=%s", quoteIfNeeded(s.IdentityAgent)))
+	}
+	if s.KbdInteractiveAuthentication != "" {
+		*parts = append(*parts, "-o", fmt.Sprintf("KbdInteractiveAuthentication=%s", s.KbdInteractiveAuthentication))
+	}
+	if s.NumberOfPasswordPrompts != "" {
+		*parts = append(*parts, "-o", fmt.Sprintf("NumberOfPasswordPrompts=%s", s.NumberOfPasswordPrompts))
 	}
 }
 

@@ -31,24 +31,29 @@ import (
 // Based on OpenSSH defaults (version 8.x+)
 var sshDefaults = map[string]string{
 	// Connection settings
-	"Port":                "22",
-	"ConnectTimeout":      "none",
-	"ConnectionAttempts":  "1",
-	"TCPKeepAlive":        "yes",
-	"ServerAliveInterval": "0",
-	"ServerAliveCountMax": "3",
-	"Compression":         "no",
+	"Port":                 "22",
+	"ConnectTimeout":       "none",
+	"ConnectionAttempts":   "1",
+	"TCPKeepAlive":         "yes",
+	"ServerAliveInterval":  "0",
+	"ServerAliveCountMax":  "3",
+	"Compression":          "no",
+	"AddressFamily":        "any",
+	"ExitOnForwardFailure": "no",
 
 	// Authentication
-	"PubkeyAuthentication":   "yes",
-	"PasswordAuthentication": "yes",
-	"IdentitiesOnly":         "no",
-	"AddKeysToAgent":         "no",
+	"PubkeyAuthentication":         "yes",
+	"PasswordAuthentication":       "yes",
+	"IdentitiesOnly":               "no",
+	"AddKeysToAgent":               "no",
+	"KbdInteractiveAuthentication": "yes",
+	"NumberOfPasswordPrompts":      "3",
 
 	// Forwarding
-	"ForwardAgent":      "no",
-	"ForwardX11":        "no",
-	"ForwardX11Trusted": "no",
+	"ForwardAgent":        "no",
+	"ForwardX11":          "no",
+	"ForwardX11Trusted":   "no",
+	"ClearAllForwardings": "no",
 
 	// Multiplexing
 	"ControlMaster":  "no",
@@ -638,30 +643,39 @@ func (sf *ServerForm) createAlgorithmAutocomplete(suggestions []string) func(str
 func (sf *ServerForm) getDefaultValues() ServerFormData {
 	if sf.mode == ServerFormEdit && sf.original != nil {
 		return ServerFormData{
-			Alias:                       sf.original.Alias,
-			Host:                        sf.original.Host,
-			User:                        sf.original.User,
-			Port:                        fmt.Sprint(sf.original.Port),
-			Key:                         strings.Join(sf.original.IdentityFiles, ", "),
-			Tags:                        strings.Join(sf.original.Tags, ", "),
-			ProxyJump:                   sf.original.ProxyJump,
-			ProxyCommand:                sf.original.ProxyCommand,
-			RemoteCommand:               sf.original.RemoteCommand,
-			RequestTTY:                  sf.original.RequestTTY,
-			SessionType:                 sf.original.SessionType,
-			ConnectTimeout:              sf.original.ConnectTimeout,
-			ConnectionAttempts:          sf.original.ConnectionAttempts,
-			BindAddress:                 sf.original.BindAddress,
-			BindInterface:               sf.original.BindInterface,
-			LocalForward:                strings.Join(sf.original.LocalForward, ", "),
-			RemoteForward:               strings.Join(sf.original.RemoteForward, ", "),
-			DynamicForward:              strings.Join(sf.original.DynamicForward, ", "),
-			PubkeyAuthentication:        sf.original.PubkeyAuthentication,
-			PasswordAuthentication:      sf.original.PasswordAuthentication,
+			Alias:                sf.original.Alias,
+			Host:                 sf.original.Host,
+			User:                 sf.original.User,
+			Port:                 fmt.Sprint(sf.original.Port),
+			Key:                  strings.Join(sf.original.IdentityFiles, ", "),
+			Tags:                 strings.Join(sf.original.Tags, ", "),
+			ProxyJump:            sf.original.ProxyJump,
+			ProxyCommand:         sf.original.ProxyCommand,
+			RemoteCommand:        sf.original.RemoteCommand,
+			RequestTTY:           sf.original.RequestTTY,
+			SessionType:          sf.original.SessionType,
+			ConnectTimeout:       sf.original.ConnectTimeout,
+			ConnectionAttempts:   sf.original.ConnectionAttempts,
+			BindAddress:          sf.original.BindAddress,
+			BindInterface:        sf.original.BindInterface,
+			AddressFamily:        sf.original.AddressFamily,
+			ExitOnForwardFailure: sf.original.ExitOnForwardFailure,
+			LocalForward:         strings.Join(sf.original.LocalForward, ", "),
+			RemoteForward:        strings.Join(sf.original.RemoteForward, ", "),
+			DynamicForward:       strings.Join(sf.original.DynamicForward, ", "),
+			ClearAllForwardings:  sf.original.ClearAllForwardings,
+			// Public key
+			PubkeyAuthentication: sf.original.PubkeyAuthentication,
+			IdentitiesOnly:       sf.original.IdentitiesOnly,
+			// SSH Agent
+			AddKeysToAgent: sf.original.AddKeysToAgent,
+			IdentityAgent:  sf.original.IdentityAgent,
+			// Password & Interactive
+			PasswordAuthentication:       sf.original.PasswordAuthentication,
+			KbdInteractiveAuthentication: sf.original.KbdInteractiveAuthentication,
+			NumberOfPasswordPrompts:      sf.original.NumberOfPasswordPrompts,
+			// Advanced
 			PreferredAuthentications:    sf.original.PreferredAuthentications,
-			IdentitiesOnly:              sf.original.IdentitiesOnly,
-			AddKeysToAgent:              sf.original.AddKeysToAgent,
-			IdentityAgent:               sf.original.IdentityAgent,
 			ForwardAgent:                sf.original.ForwardAgent,
 			ForwardX11:                  sf.original.ForwardX11,
 			ForwardX11Trusted:           sf.original.ForwardX11Trusted,
@@ -702,8 +716,20 @@ func (sf *ServerForm) createBasicForm() {
 
 	form.AddInputField("Alias:", defaultValues.Alias, 20, nil, nil)
 	form.AddInputField("Host/IP:", defaultValues.Host, 20, nil, nil)
-	form.AddInputField("User:", defaultValues.User, 20, nil, nil)
-	form.AddInputField("Port:", defaultValues.Port, 20, nil, nil)
+
+	userField := tview.NewInputField().
+		SetLabel("User:").
+		SetText(defaultValues.User).
+		SetFieldWidth(20).
+		SetPlaceholder("default: root")
+	form.AddFormItem(userField)
+
+	portField := tview.NewInputField().
+		SetLabel("Port:").
+		SetText(defaultValues.Port).
+		SetFieldWidth(20).
+		SetPlaceholder("default: 22")
+	form.AddFormItem(portField)
 	keysField := tview.NewInputField().
 		SetLabel("Keys:").
 		SetText(defaultValues.Key).
@@ -759,9 +785,15 @@ func (sf *ServerForm) createConnectionForm() {
 		SetLabel("ConnectTimeout:").
 		SetText(defaultValues.ConnectTimeout).
 		SetFieldWidth(10).
-		SetPlaceholder("seconds")
+		SetPlaceholder("seconds (default: none)")
 	form.AddFormItem(connectTimeoutField)
-	form.AddInputField("ConnectionAttempts:", defaultValues.ConnectionAttempts, 10, nil, nil)
+
+	connectionAttemptsField := tview.NewInputField().
+		SetLabel("ConnectionAttempts:").
+		SetText(defaultValues.ConnectionAttempts).
+		SetFieldWidth(10).
+		SetPlaceholder("default: 1")
+	form.AddFormItem(connectionAttemptsField)
 
 	form.AddTextView("[yellow]Bind Options[-]", "", 0, 1, true, false)
 	form.AddInputField("BindAddress:", defaultValues.BindAddress, 40, nil, nil)
@@ -771,14 +803,25 @@ func (sf *ServerForm) createConnectionForm() {
 	bindInterfaceIndex := sf.findOptionIndex(interfaceOptions, defaultValues.BindInterface)
 	form.AddDropDown("BindInterface:", interfaceOptions, bindInterfaceIndex, nil)
 
+	// AddressFamily dropdown
+	addressFamilyOptions := createOptionsWithDefault("AddressFamily", []string{"", "any", "inet", "inet6"})
+	addressFamilyIndex := sf.findOptionIndex(addressFamilyOptions, defaultValues.AddressFamily)
+	form.AddDropDown("AddressFamily:", addressFamilyOptions, addressFamilyIndex, nil)
+
 	form.AddTextView("[yellow]Keep-Alive[-]", "", 0, 1, true, false)
 	serverAliveIntervalField := tview.NewInputField().
 		SetLabel("ServerAliveInterval:").
 		SetText(defaultValues.ServerAliveInterval).
 		SetFieldWidth(10).
-		SetPlaceholder("seconds")
+		SetPlaceholder("seconds (default: 0)")
 	form.AddFormItem(serverAliveIntervalField)
-	form.AddInputField("ServerAliveCountMax:", defaultValues.ServerAliveCountMax, 20, nil, nil)
+
+	serverAliveCountMaxField := tview.NewInputField().
+		SetLabel("ServerAliveCountMax:").
+		SetText(defaultValues.ServerAliveCountMax).
+		SetFieldWidth(10).
+		SetPlaceholder("default: 3")
+	form.AddFormItem(serverAliveCountMaxField)
 
 	// Compression dropdown
 	compressionOptions := createOptionsWithDefault("Compression", []string{"", "yes", "no"})
@@ -835,6 +878,16 @@ func (sf *ServerForm) createForwardingForm() {
 		SetFieldWidth(40).
 		SetPlaceholder("e.g., 1080, 1081")
 	form.AddFormItem(dynamicForwardField)
+
+	// ClearAllForwardings dropdown
+	clearAllForwardingsOptions := createOptionsWithDefault("ClearAllForwardings", []string{"", "yes", "no"})
+	clearAllForwardingsIndex := sf.findOptionIndex(clearAllForwardingsOptions, defaultValues.ClearAllForwardings)
+	form.AddDropDown("ClearAllForwardings:", clearAllForwardingsOptions, clearAllForwardingsIndex, nil)
+
+	// ExitOnForwardFailure dropdown
+	exitOnForwardFailureOptions := createOptionsWithDefault("ExitOnForwardFailure", []string{"", "yes", "no"})
+	exitOnForwardFailureIndex := sf.findOptionIndex(exitOnForwardFailureOptions, defaultValues.ExitOnForwardFailure)
+	form.AddDropDown("ExitOnForwardFailure:", exitOnForwardFailureOptions, exitOnForwardFailureIndex, nil)
 
 	form.AddTextView("[yellow]Agent & X11 Forwarding[-]", "", 0, 1, true, false)
 
@@ -930,22 +983,21 @@ func (sf *ServerForm) createAuthenticationForm() {
 	form := tview.NewForm()
 	defaultValues := sf.getDefaultValues()
 
+	// Most common: Public key authentication
+	form.AddTextView("[yellow]Public Key Authentication[-]", "", 0, 1, true, false)
+
 	// PubkeyAuthentication dropdown
 	pubkeyOptions := createOptionsWithDefault("PubkeyAuthentication", []string{"", "yes", "no"})
 	pubkeyIndex := sf.findOptionIndex(pubkeyOptions, defaultValues.PubkeyAuthentication)
 	form.AddDropDown("PubkeyAuthentication:", pubkeyOptions, pubkeyIndex, nil)
 
-	// PasswordAuthentication dropdown
-	passwordOptions := createOptionsWithDefault("PasswordAuthentication", []string{"", "yes", "no"})
-	passwordIndex := sf.findOptionIndex(passwordOptions, defaultValues.PasswordAuthentication)
-	form.AddDropDown("PasswordAuthentication:", passwordOptions, passwordIndex, nil)
-
-	form.AddInputField("PreferredAuthentications:", defaultValues.PreferredAuthentications, 40, nil, nil)
-
-	// IdentitiesOnly dropdown
+	// IdentitiesOnly dropdown - controls whether to use only specified identity files
 	identitiesOnlyOptions := createOptionsWithDefault("IdentitiesOnly", []string{"", "yes", "no"})
 	identitiesOnlyIndex := sf.findOptionIndex(identitiesOnlyOptions, defaultValues.IdentitiesOnly)
 	form.AddDropDown("IdentitiesOnly:", identitiesOnlyOptions, identitiesOnlyIndex, nil)
+
+	// SSH Agent settings
+	form.AddTextView("[yellow]SSH Agent[-]", "", 0, 1, true, false)
 
 	// AddKeysToAgent dropdown
 	addKeysOptions := createOptionsWithDefault("AddKeysToAgent", []string{"", "yes", "no", "ask", "confirm"})
@@ -953,6 +1005,37 @@ func (sf *ServerForm) createAuthenticationForm() {
 	form.AddDropDown("AddKeysToAgent:", addKeysOptions, addKeysIndex, nil)
 
 	form.AddInputField("IdentityAgent:", defaultValues.IdentityAgent, 40, nil, nil)
+
+	// Password/Interactive authentication
+	form.AddTextView("[yellow]Password & Interactive[-]", "", 0, 1, true, false)
+
+	// PasswordAuthentication dropdown
+	passwordOptions := createOptionsWithDefault("PasswordAuthentication", []string{"", "yes", "no"})
+	passwordIndex := sf.findOptionIndex(passwordOptions, defaultValues.PasswordAuthentication)
+	form.AddDropDown("PasswordAuthentication:", passwordOptions, passwordIndex, nil)
+
+	// KbdInteractiveAuthentication dropdown
+	kbdInteractiveOptions := createOptionsWithDefault("KbdInteractiveAuthentication", []string{"", "yes", "no"})
+	kbdInteractiveIndex := sf.findOptionIndex(kbdInteractiveOptions, defaultValues.KbdInteractiveAuthentication)
+	form.AddDropDown("KbdInteractiveAuthentication:", kbdInteractiveOptions, kbdInteractiveIndex, nil)
+
+	// NumberOfPasswordPrompts field
+	passwordPromptsField := tview.NewInputField().
+		SetLabel("NumberOfPasswordPrompts:").
+		SetText(defaultValues.NumberOfPasswordPrompts).
+		SetFieldWidth(10).
+		SetPlaceholder("default: 3")
+	form.AddFormItem(passwordPromptsField)
+
+	// Advanced: Authentication order preference
+	form.AddTextView("[yellow]Advanced[-]", "", 0, 1, true, false)
+
+	preferredAuthField := tview.NewInputField().
+		SetLabel("PreferredAuthentications:").
+		SetText(defaultValues.PreferredAuthentications).
+		SetFieldWidth(40).
+		SetPlaceholder("e.g., publickey,password")
+	form.AddFormItem(preferredAuthField)
 
 	// Add save and cancel buttons
 	form.AddButton("Save", sf.handleSaveWrapper)
@@ -1084,28 +1167,37 @@ type ServerFormData struct {
 	Tags  string
 
 	// Connection and proxy settings
-	ProxyJump          string
-	ProxyCommand       string
-	RemoteCommand      string
-	RequestTTY         string
-	SessionType        string
-	ConnectTimeout     string
-	ConnectionAttempts string
-	BindAddress        string
-	BindInterface      string
+	ProxyJump            string
+	ProxyCommand         string
+	RemoteCommand        string
+	RequestTTY           string
+	SessionType          string
+	ConnectTimeout       string
+	ConnectionAttempts   string
+	BindAddress          string
+	BindInterface        string
+	AddressFamily        string
+	ExitOnForwardFailure string
 
 	// Port forwarding
-	LocalForward   string
-	RemoteForward  string
-	DynamicForward string
+	LocalForward        string
+	RemoteForward       string
+	DynamicForward      string
+	ClearAllForwardings string
 
 	// Authentication and key management
-	PubkeyAuthentication     string
-	PasswordAuthentication   string
+	// Public key
+	PubkeyAuthentication string
+	IdentitiesOnly       string
+	// SSH Agent
+	AddKeysToAgent string
+	IdentityAgent  string
+	// Password & Interactive
+	PasswordAuthentication       string
+	KbdInteractiveAuthentication string
+	NumberOfPasswordPrompts      string
+	// Advanced
 	PreferredAuthentications string
-	IdentitiesOnly           string
-	AddKeysToAgent           string
-	IdentityAgent            string
 
 	// Agent and X11 forwarding
 	ForwardAgent      string
@@ -1187,26 +1279,35 @@ func (sf *ServerForm) getFormData() ServerFormData {
 		Key:   getFieldText("Keys:"),
 		Tags:  getFieldText("Tags:"),
 		// Connection and proxy settings
-		ProxyJump:          getFieldText("ProxyJump:"),
-		ProxyCommand:       getFieldText("ProxyCommand:"),
-		RemoteCommand:      getFieldText("RemoteCommand:"),
-		RequestTTY:         getDropdownValue("RequestTTY:"),
-		SessionType:        sf.parseSessionType(getDropdownValue("SessionType:")),
-		ConnectTimeout:     getFieldText("ConnectTimeout:"),
-		ConnectionAttempts: getFieldText("ConnectionAttempts:"),
-		BindAddress:        getFieldText("BindAddress:"),
-		BindInterface:      getDropdownValue("BindInterface:"),
+		ProxyJump:            getFieldText("ProxyJump:"),
+		ProxyCommand:         getFieldText("ProxyCommand:"),
+		RemoteCommand:        getFieldText("RemoteCommand:"),
+		RequestTTY:           getDropdownValue("RequestTTY:"),
+		SessionType:          sf.parseSessionType(getDropdownValue("SessionType:")),
+		ConnectTimeout:       getFieldText("ConnectTimeout:"),
+		ConnectionAttempts:   getFieldText("ConnectionAttempts:"),
+		BindAddress:          getFieldText("BindAddress:"),
+		BindInterface:        getDropdownValue("BindInterface:"),
+		AddressFamily:        getDropdownValue("AddressFamily:"),
+		ExitOnForwardFailure: getDropdownValue("ExitOnForwardFailure:"),
 		// Port forwarding
-		LocalForward:   getFieldText("LocalForward:"),
-		RemoteForward:  getFieldText("RemoteForward:"),
-		DynamicForward: getFieldText("DynamicForward:"),
+		LocalForward:        getFieldText("LocalForward:"),
+		RemoteForward:       getFieldText("RemoteForward:"),
+		DynamicForward:      getFieldText("DynamicForward:"),
+		ClearAllForwardings: getDropdownValue("ClearAllForwardings:"),
 		// Authentication and key management
-		PubkeyAuthentication:     getDropdownValue("PubkeyAuthentication:"),
-		PasswordAuthentication:   getDropdownValue("PasswordAuthentication:"),
+		// Public key
+		PubkeyAuthentication: getDropdownValue("PubkeyAuthentication:"),
+		IdentitiesOnly:       getDropdownValue("IdentitiesOnly:"),
+		// SSH Agent
+		AddKeysToAgent: getDropdownValue("AddKeysToAgent:"),
+		IdentityAgent:  getFieldText("IdentityAgent:"),
+		// Password & Interactive
+		PasswordAuthentication:       getDropdownValue("PasswordAuthentication:"),
+		KbdInteractiveAuthentication: getDropdownValue("KbdInteractiveAuthentication:"),
+		NumberOfPasswordPrompts:      getFieldText("NumberOfPasswordPrompts:"),
+		// Advanced
 		PreferredAuthentications: getFieldText("PreferredAuthentications:"),
-		IdentitiesOnly:           getDropdownValue("IdentitiesOnly:"),
-		AddKeysToAgent:           getDropdownValue("AddKeysToAgent:"),
-		IdentityAgent:            getFieldText("IdentityAgent:"),
 		// Agent and X11 forwarding
 		ForwardAgent:      getDropdownValue("ForwardAgent:"),
 		ForwardX11:        getDropdownValue("ForwardX11:"),
@@ -1527,30 +1628,39 @@ func (sf *ServerForm) dataToServer(data ServerFormData) domain.Server {
 	}
 
 	server := domain.Server{
-		Alias:                       data.Alias,
-		Host:                        data.Host,
-		User:                        data.User,
-		Port:                        port,
-		IdentityFiles:               keys,
-		Tags:                        tags,
-		ProxyJump:                   data.ProxyJump,
-		ProxyCommand:                data.ProxyCommand,
-		RemoteCommand:               data.RemoteCommand,
-		RequestTTY:                  data.RequestTTY,
-		SessionType:                 data.SessionType,
-		ConnectTimeout:              data.ConnectTimeout,
-		ConnectionAttempts:          data.ConnectionAttempts,
-		BindAddress:                 data.BindAddress,
-		BindInterface:               data.BindInterface,
-		LocalForward:                splitComma(data.LocalForward),
-		RemoteForward:               splitComma(data.RemoteForward),
-		DynamicForward:              splitComma(data.DynamicForward),
-		PubkeyAuthentication:        data.PubkeyAuthentication,
-		PasswordAuthentication:      data.PasswordAuthentication,
+		Alias:                data.Alias,
+		Host:                 data.Host,
+		User:                 data.User,
+		Port:                 port,
+		IdentityFiles:        keys,
+		Tags:                 tags,
+		ProxyJump:            data.ProxyJump,
+		ProxyCommand:         data.ProxyCommand,
+		RemoteCommand:        data.RemoteCommand,
+		RequestTTY:           data.RequestTTY,
+		SessionType:          data.SessionType,
+		ConnectTimeout:       data.ConnectTimeout,
+		ConnectionAttempts:   data.ConnectionAttempts,
+		BindAddress:          data.BindAddress,
+		BindInterface:        data.BindInterface,
+		AddressFamily:        data.AddressFamily,
+		ExitOnForwardFailure: data.ExitOnForwardFailure,
+		LocalForward:         splitComma(data.LocalForward),
+		RemoteForward:        splitComma(data.RemoteForward),
+		DynamicForward:       splitComma(data.DynamicForward),
+		ClearAllForwardings:  data.ClearAllForwardings,
+		// Public key
+		PubkeyAuthentication: data.PubkeyAuthentication,
+		IdentitiesOnly:       data.IdentitiesOnly,
+		// SSH Agent
+		AddKeysToAgent: data.AddKeysToAgent,
+		IdentityAgent:  data.IdentityAgent,
+		// Password & Interactive
+		PasswordAuthentication:       data.PasswordAuthentication,
+		KbdInteractiveAuthentication: data.KbdInteractiveAuthentication,
+		NumberOfPasswordPrompts:      data.NumberOfPasswordPrompts,
+		// Advanced
 		PreferredAuthentications:    data.PreferredAuthentications,
-		IdentitiesOnly:              data.IdentitiesOnly,
-		AddKeysToAgent:              data.AddKeysToAgent,
-		IdentityAgent:               data.IdentityAgent,
 		ForwardAgent:                data.ForwardAgent,
 		ForwardX11:                  data.ForwardX11,
 		ForwardX11Trusted:           data.ForwardX11Trusted,
