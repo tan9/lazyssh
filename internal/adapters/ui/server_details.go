@@ -158,6 +158,10 @@ func (sd *ServerDetails) UpdateServer(server domain.Server) {
 				{"Ciphers", server.Ciphers},
 				{"MACs", server.MACs},
 				{"KexAlgorithms", server.KexAlgorithms},
+				{"VerifyHostKeyDNS", server.VerifyHostKeyDNS},
+				{"UpdateHostKeys", server.UpdateHostKeys},
+				{"HashKnownHosts", server.HashKnownHosts},
+				{"VisualHostKey", server.VisualHostKey},
 			},
 		},
 		{
@@ -165,6 +169,7 @@ func (sd *ServerDetails) UpdateServer(server domain.Server) {
 			fields: []fieldEntry{
 				{"LocalCommand", server.LocalCommand},
 				{"PermitLocalCommand", server.PermitLocalCommand},
+				{"EscapeChar", server.EscapeChar},
 				{"SendEnv", strings.Join(server.SendEnv, ", ")},
 				{"SetEnv", strings.Join(server.SetEnv, ", ")},
 			},

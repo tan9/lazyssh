@@ -97,10 +97,15 @@ type Server struct {
 	MACs                  string
 	Ciphers               string
 	KexAlgorithms         string
+	VerifyHostKeyDNS      string // yes, no, ask
+	UpdateHostKeys        string // yes, no, ask
+	HashKnownHosts        string // yes, no
+	VisualHostKey         string // yes, no
 
 	// Command execution
 	LocalCommand       string
 	PermitLocalCommand string
+	EscapeChar         string // single character or "none"
 
 	// Environment settings
 	SendEnv []string

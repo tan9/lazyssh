@@ -69,7 +69,12 @@ var sshDefaults = map[string]string{
 	"StrictHostKeyChecking": "ask",
 	"CheckHostIP":           "no",
 	"FingerprintHash":       "SHA256",
+	"VerifyHostKeyDNS":      "no",
+	"UpdateHostKeys":        "no",
+	"HashKnownHosts":        "no",
+	"VisualHostKey":         "no",
 	"PermitLocalCommand":    "no",
+	"EscapeChar":            "~",
 	"BatchMode":             "no",
 
 	// Other
@@ -701,8 +706,13 @@ func (sf *ServerForm) getDefaultValues() ServerFormData {
 			MACs:                        sf.original.MACs,
 			Ciphers:                     sf.original.Ciphers,
 			KexAlgorithms:               sf.original.KexAlgorithms,
+			VerifyHostKeyDNS:            sf.original.VerifyHostKeyDNS,
+			UpdateHostKeys:              sf.original.UpdateHostKeys,
+			HashKnownHosts:              sf.original.HashKnownHosts,
+			VisualHostKey:               sf.original.VisualHostKey,
 			LocalCommand:                sf.original.LocalCommand,
 			PermitLocalCommand:          sf.original.PermitLocalCommand,
+			EscapeChar:                  sf.original.EscapeChar,
 			SendEnv:                     strings.Join(sf.original.SendEnv, ", "),
 			SetEnv:                      strings.Join(sf.original.SetEnv, ", "),
 			LogLevel:                    sf.original.LogLevel,
@@ -1116,6 +1126,26 @@ func (sf *ServerForm) createAdvancedForm() {
 	fingerprintHashIndex := sf.findOptionIndex(fingerprintHashOptions, defaultValues.FingerprintHash)
 	form.AddDropDown("FingerprintHash:", fingerprintHashOptions, fingerprintHashIndex, nil)
 
+	// VerifyHostKeyDNS dropdown
+	verifyHostKeyDNSOptions := createOptionsWithDefault("VerifyHostKeyDNS", []string{"", "yes", "no", "ask"})
+	verifyHostKeyDNSIndex := sf.findOptionIndex(verifyHostKeyDNSOptions, defaultValues.VerifyHostKeyDNS)
+	form.AddDropDown("VerifyHostKeyDNS:", verifyHostKeyDNSOptions, verifyHostKeyDNSIndex, nil)
+
+	// UpdateHostKeys dropdown
+	updateHostKeysOptions := createOptionsWithDefault("UpdateHostKeys", []string{"", "yes", "no", "ask"})
+	updateHostKeysIndex := sf.findOptionIndex(updateHostKeysOptions, defaultValues.UpdateHostKeys)
+	form.AddDropDown("UpdateHostKeys:", updateHostKeysOptions, updateHostKeysIndex, nil)
+
+	// HashKnownHosts dropdown
+	hashKnownHostsOptions := createOptionsWithDefault("HashKnownHosts", []string{"", "yes", "no"})
+	hashKnownHostsIndex := sf.findOptionIndex(hashKnownHostsOptions, defaultValues.HashKnownHosts)
+	form.AddDropDown("HashKnownHosts:", hashKnownHostsOptions, hashKnownHostsIndex, nil)
+
+	// VisualHostKey dropdown
+	visualHostKeyOptions := createOptionsWithDefault("VisualHostKey", []string{"", "yes", "no"})
+	visualHostKeyIndex := sf.findOptionIndex(visualHostKeyOptions, defaultValues.VisualHostKey)
+	form.AddDropDown("VisualHostKey:", visualHostKeyOptions, visualHostKeyIndex, nil)
+
 	form.AddInputField("UserKnownHostsFile:", defaultValues.UserKnownHostsFile, 40, nil, nil)
 
 	form.AddTextView("[yellow]Cryptography[-] [dim](+/-/^)[-]", "", 0, 1, true, false)
@@ -1175,6 +1205,14 @@ func (sf *ServerForm) createAdvancedForm() {
 	permitLocalCommandOptions := createOptionsWithDefault("PermitLocalCommand", []string{"", "yes", "no"})
 	permitLocalCommandIndex := sf.findOptionIndex(permitLocalCommandOptions, defaultValues.PermitLocalCommand)
 	form.AddDropDown("PermitLocalCommand:", permitLocalCommandOptions, permitLocalCommandIndex, nil)
+
+	// EscapeChar input field
+	escapeCharField := tview.NewInputField().
+		SetLabel("EscapeChar:").
+		SetText(defaultValues.EscapeChar).
+		SetFieldWidth(10).
+		SetPlaceholder("default: ~")
+	form.AddFormItem(escapeCharField)
 
 	form.AddTextView("[yellow]Environment[-]", "", 0, 1, true, false)
 	sendEnvField := tview.NewInputField().
@@ -1290,10 +1328,15 @@ type ServerFormData struct {
 	MACs                        string
 	Ciphers                     string
 	KexAlgorithms               string
+	VerifyHostKeyDNS            string
+	UpdateHostKeys              string
+	HashKnownHosts              string
+	VisualHostKey               string
 
 	// Command execution
 	LocalCommand       string
 	PermitLocalCommand string
+	EscapeChar         string
 
 	// Environment settings
 	SendEnv string
@@ -1395,9 +1438,14 @@ func (sf *ServerForm) getFormData() ServerFormData {
 		MACs:                     getFieldText("MACs:"),
 		Ciphers:                  getFieldText("Ciphers:"),
 		KexAlgorithms:            getFieldText("KexAlgorithms:"),
+		VerifyHostKeyDNS:         getDropdownValue("VerifyHostKeyDNS:"),
+		UpdateHostKeys:           getDropdownValue("UpdateHostKeys:"),
+		HashKnownHosts:           getDropdownValue("HashKnownHosts:"),
+		VisualHostKey:            getDropdownValue("VisualHostKey:"),
 		// Command execution
 		LocalCommand:       getFieldText("LocalCommand:"),
 		PermitLocalCommand: getDropdownValue("PermitLocalCommand:"),
+		EscapeChar:         getFieldText("EscapeChar:"),
 		// Environment settings
 		SendEnv: getFieldText("SendEnv:"),
 		SetEnv:  getFieldText("SetEnv:"),
@@ -1745,8 +1793,13 @@ func (sf *ServerForm) dataToServer(data ServerFormData) domain.Server {
 		MACs:                        data.MACs,
 		Ciphers:                     data.Ciphers,
 		KexAlgorithms:               data.KexAlgorithms,
+		VerifyHostKeyDNS:            data.VerifyHostKeyDNS,
+		UpdateHostKeys:              data.UpdateHostKeys,
+		HashKnownHosts:              data.HashKnownHosts,
+		VisualHostKey:               data.VisualHostKey,
 		LocalCommand:                data.LocalCommand,
 		PermitLocalCommand:          data.PermitLocalCommand,
+		EscapeChar:                  data.EscapeChar,
 		SendEnv:                     splitComma(data.SendEnv),
 		SetEnv:                      splitComma(data.SetEnv),
 		LogLevel:                    data.LogLevel,

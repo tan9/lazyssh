@@ -243,6 +243,14 @@ func (r *Repository) mapSecurityConfig(server *domain.Server, key, value string)
 		server.Ciphers = value
 	case "kexalgorithms":
 		server.KexAlgorithms = value
+	case "verifyhostkeydns":
+		server.VerifyHostKeyDNS = value
+	case "updatehostkeys":
+		server.UpdateHostKeys = value
+	case "hashknownhosts":
+		server.HashKnownHosts = value
+	case "visualhostkey":
+		server.VisualHostKey = value
 	default:
 		return false
 	}
@@ -256,6 +264,8 @@ func (r *Repository) mapEnvironmentConfig(server *domain.Server, key, value stri
 		server.LocalCommand = value
 	case "permitlocalcommand":
 		server.PermitLocalCommand = value
+	case "escapechar":
+		server.EscapeChar = value
 	case "sendenv":
 		server.SendEnv = append(server.SendEnv, value)
 	case "setenv":

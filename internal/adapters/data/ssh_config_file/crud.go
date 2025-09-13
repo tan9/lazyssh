@@ -161,10 +161,15 @@ func (r *Repository) createHostFromServer(server domain.Server) *ssh_config.Host
 	r.addKVNodeIfNotEmpty(host, "StrictHostKeyChecking", server.StrictHostKeyChecking)
 	r.addKVNodeIfNotEmpty(host, "UserKnownHostsFile", server.UserKnownHostsFile)
 	r.addKVNodeIfNotEmpty(host, "HostKeyAlgorithms", server.HostKeyAlgorithms)
+	r.addKVNodeIfNotEmpty(host, "VerifyHostKeyDNS", server.VerifyHostKeyDNS)
+	r.addKVNodeIfNotEmpty(host, "UpdateHostKeys", server.UpdateHostKeys)
+	r.addKVNodeIfNotEmpty(host, "HashKnownHosts", server.HashKnownHosts)
+	r.addKVNodeIfNotEmpty(host, "VisualHostKey", server.VisualHostKey)
 
 	// Command execution
 	r.addKVNodeIfNotEmpty(host, "LocalCommand", server.LocalCommand)
 	r.addKVNodeIfNotEmpty(host, "PermitLocalCommand", server.PermitLocalCommand)
+	r.addKVNodeIfNotEmpty(host, "EscapeChar", server.EscapeChar)
 
 	// Environment settings
 	for _, env := range server.SendEnv {
@@ -258,8 +263,13 @@ func (r *Repository) updateHostNodes(host *ssh_config.Host, newServer domain.Ser
 		"macs":                            newServer.MACs,
 		"ciphers":                         newServer.Ciphers,
 		"kexalgorithms":                   newServer.KexAlgorithms,
+		"verifyhostkeydns":                newServer.VerifyHostKeyDNS,
+		"updatehostkeys":                  newServer.UpdateHostKeys,
+		"hashknownhosts":                  newServer.HashKnownHosts,
+		"visualhostkey":                   newServer.VisualHostKey,
 		"localcommand":                    newServer.LocalCommand,
 		"permitlocalcommand":              newServer.PermitLocalCommand,
+		"escapechar":                      newServer.EscapeChar,
 		"loglevel":                        newServer.LogLevel,
 		"batchmode":                       newServer.BatchMode,
 	}

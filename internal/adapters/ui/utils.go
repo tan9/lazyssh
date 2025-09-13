@@ -353,6 +353,9 @@ func addCommandExecutionOptions(parts *[]string, s domain.Server) {
 	if s.PermitLocalCommand != "" {
 		*parts = append(*parts, "-o", fmt.Sprintf("PermitLocalCommand=%s", s.PermitLocalCommand))
 	}
+	if s.EscapeChar != "" {
+		*parts = append(*parts, "-e", s.EscapeChar)
+	}
 }
 
 // addEnvironmentOptions adds environment variable options to the SSH command
@@ -390,6 +393,18 @@ func addSecurityOptions(parts *[]string, s domain.Server) {
 	}
 	if s.KexAlgorithms != "" {
 		*parts = append(*parts, "-o", fmt.Sprintf("KexAlgorithms=%s", s.KexAlgorithms))
+	}
+	if s.VerifyHostKeyDNS != "" {
+		*parts = append(*parts, "-o", fmt.Sprintf("VerifyHostKeyDNS=%s", s.VerifyHostKeyDNS))
+	}
+	if s.UpdateHostKeys != "" {
+		*parts = append(*parts, "-o", fmt.Sprintf("UpdateHostKeys=%s", s.UpdateHostKeys))
+	}
+	if s.HashKnownHosts != "" {
+		*parts = append(*parts, "-o", fmt.Sprintf("HashKnownHosts=%s", s.HashKnownHosts))
+	}
+	if s.VisualHostKey != "" {
+		*parts = append(*parts, "-o", fmt.Sprintf("VisualHostKey=%s", s.VisualHostKey))
 	}
 }
 
