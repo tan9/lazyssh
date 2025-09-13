@@ -114,6 +114,7 @@ func (sd *ServerDetails) UpdateServer(server domain.Server) {
 				{"ServerAliveCountMax", server.ServerAliveCountMax},
 				{"Compression", server.Compression},
 				{"TCPKeepAlive", server.TCPKeepAlive},
+				{"BatchMode", server.BatchMode},
 				{"ControlMaster", server.ControlMaster},
 				{"ControlPath", server.ControlPath},
 				{"ControlPersist", server.ControlPersist},
@@ -178,7 +179,6 @@ func (sd *ServerDetails) UpdateServer(server domain.Server) {
 			name: "Debugging",
 			fields: []fieldEntry{
 				{"LogLevel", server.LogLevel},
-				{"BatchMode", server.BatchMode},
 			},
 		},
 	}

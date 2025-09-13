@@ -698,6 +698,7 @@ func (sf *ServerForm) getDefaultValues() ServerFormData {
 			ServerAliveCountMax:         sf.original.ServerAliveCountMax,
 			Compression:                 sf.original.Compression,
 			TCPKeepAlive:                sf.original.TCPKeepAlive,
+			BatchMode:                   sf.original.BatchMode,
 			StrictHostKeyChecking:       sf.original.StrictHostKeyChecking,
 			UserKnownHostsFile:          sf.original.UserKnownHostsFile,
 			HostKeyAlgorithms:           sf.original.HostKeyAlgorithms,
@@ -716,7 +717,6 @@ func (sf *ServerForm) getDefaultValues() ServerFormData {
 			SendEnv:                     strings.Join(sf.original.SendEnv, ", "),
 			SetEnv:                      strings.Join(sf.original.SetEnv, ", "),
 			LogLevel:                    sf.original.LogLevel,
-			BatchMode:                   sf.original.BatchMode,
 		}
 	}
 	return ServerFormData{
@@ -883,6 +883,11 @@ func (sf *ServerForm) createConnectionForm() {
 	tcpKeepAliveOptions := createOptionsWithDefault("TCPKeepAlive", []string{"", "yes", "no"})
 	tcpKeepAliveIndex := sf.findOptionIndex(tcpKeepAliveOptions, defaultValues.TCPKeepAlive)
 	form.AddDropDown("TCPKeepAlive:", tcpKeepAliveOptions, tcpKeepAliveIndex, nil)
+
+	// BatchMode dropdown - disable all interactive prompts
+	batchModeOptions := createOptionsWithDefault("BatchMode", []string{"", "yes", "no"})
+	batchModeIndex := sf.findOptionIndex(batchModeOptions, defaultValues.BatchMode)
+	form.AddDropDown("BatchMode:", batchModeOptions, batchModeIndex, nil)
 
 	form.AddTextView("[yellow]Multiplexing[-]", "", 0, 1, true, false)
 	// ControlMaster dropdown
@@ -1236,11 +1241,6 @@ func (sf *ServerForm) createAdvancedForm() {
 	logLevelIndex := sf.findOptionIndex(logLevelOptions, defaultValues.LogLevel)
 	form.AddDropDown("LogLevel:", logLevelOptions, logLevelIndex, nil)
 
-	// BatchMode dropdown
-	batchModeOptions := createOptionsWithDefault("BatchMode", []string{"", "yes", "no"})
-	batchModeIndex := sf.findOptionIndex(batchModeOptions, defaultValues.BatchMode)
-	form.AddDropDown("BatchMode:", batchModeOptions, batchModeIndex, nil)
-
 	// Add save and cancel buttons
 	form.AddButton("Save", sf.handleSaveWrapper)
 	form.AddButton("Cancel", sf.handleCancel)
@@ -1316,6 +1316,7 @@ type ServerFormData struct {
 	ServerAliveCountMax string
 	Compression         string
 	TCPKeepAlive        string
+	BatchMode           string
 
 	// Security settings
 	StrictHostKeyChecking       string
@@ -1343,8 +1344,7 @@ type ServerFormData struct {
 	SetEnv  string
 
 	// Debugging settings
-	LogLevel  string
-	BatchMode string
+	LogLevel string
 }
 
 func (sf *ServerForm) getFormData() ServerFormData {
@@ -1430,6 +1430,7 @@ func (sf *ServerForm) getFormData() ServerFormData {
 		ServerAliveCountMax: getFieldText("ServerAliveCountMax:"),
 		Compression:         getDropdownValue("Compression:"),
 		TCPKeepAlive:        getDropdownValue("TCPKeepAlive:"),
+		BatchMode:           getDropdownValue("BatchMode:"),
 		// Security settings
 		StrictHostKeyChecking:    getDropdownValue("StrictHostKeyChecking:"),
 		UserKnownHostsFile:       getFieldText("UserKnownHostsFile:"),
@@ -1450,8 +1451,7 @@ func (sf *ServerForm) getFormData() ServerFormData {
 		SendEnv: getFieldText("SendEnv:"),
 		SetEnv:  getFieldText("SetEnv:"),
 		// Debugging settings
-		LogLevel:  getDropdownValue("LogLevel:"),
-		BatchMode: getDropdownValue("BatchMode:"),
+		LogLevel: getDropdownValue("LogLevel:"),
 	}
 }
 
@@ -1785,6 +1785,7 @@ func (sf *ServerForm) dataToServer(data ServerFormData) domain.Server {
 		ServerAliveCountMax:         data.ServerAliveCountMax,
 		Compression:                 data.Compression,
 		TCPKeepAlive:                data.TCPKeepAlive,
+		BatchMode:                   data.BatchMode,
 		StrictHostKeyChecking:       data.StrictHostKeyChecking,
 		UserKnownHostsFile:          data.UserKnownHostsFile,
 		HostKeyAlgorithms:           data.HostKeyAlgorithms,
@@ -1803,7 +1804,6 @@ func (sf *ServerForm) dataToServer(data ServerFormData) domain.Server {
 		SendEnv:                     splitComma(data.SendEnv),
 		SetEnv:                      splitComma(data.SetEnv),
 		LogLevel:                    data.LogLevel,
-		BatchMode:                   data.BatchMode,
 	}
 
 	// Preserve metadata fields from original if in edit mode

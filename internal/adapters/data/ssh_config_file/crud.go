@@ -156,6 +156,7 @@ func (r *Repository) createHostFromServer(server domain.Server) *ssh_config.Host
 	r.addKVNodeIfNotEmpty(host, "ServerAliveCountMax", server.ServerAliveCountMax)
 	r.addKVNodeIfNotEmpty(host, "Compression", server.Compression)
 	r.addKVNodeIfNotEmpty(host, "TCPKeepAlive", server.TCPKeepAlive)
+	r.addKVNodeIfNotEmpty(host, "BatchMode", server.BatchMode)
 
 	// Security
 	r.addKVNodeIfNotEmpty(host, "StrictHostKeyChecking", server.StrictHostKeyChecking)
@@ -181,7 +182,6 @@ func (r *Repository) createHostFromServer(server domain.Server) *ssh_config.Host
 
 	// Debugging
 	r.addKVNodeIfNotEmpty(host, "LogLevel", server.LogLevel)
-	r.addKVNodeIfNotEmpty(host, "BatchMode", server.BatchMode)
 
 	return host
 }
@@ -255,6 +255,7 @@ func (r *Repository) updateHostNodes(host *ssh_config.Host, newServer domain.Ser
 		"serveralivecountmax":             newServer.ServerAliveCountMax,
 		"compression":                     newServer.Compression,
 		"tcpkeepalive":                    newServer.TCPKeepAlive,
+		"batchmode":                       newServer.BatchMode,
 		"stricthostkeychecking":           newServer.StrictHostKeyChecking,
 		"checkhostip":                     newServer.CheckHostIP,
 		"fingerprinthash":                 newServer.FingerprintHash,
@@ -271,7 +272,6 @@ func (r *Repository) updateHostNodes(host *ssh_config.Host, newServer domain.Ser
 		"permitlocalcommand":              newServer.PermitLocalCommand,
 		"escapechar":                      newServer.EscapeChar,
 		"loglevel":                        newServer.LogLevel,
-		"batchmode":                       newServer.BatchMode,
 	}
 
 	// Update or remove nodes based on value

@@ -343,6 +343,9 @@ func addConnectionOptions(parts *[]string, s domain.Server) {
 	if s.TCPKeepAlive != "" {
 		*parts = append(*parts, "-o", fmt.Sprintf("TCPKeepAlive=%s", s.TCPKeepAlive))
 	}
+	if s.BatchMode == sshYes {
+		*parts = append(*parts, "-o", "BatchMode=yes")
+	}
 }
 
 // addCommandExecutionOptions adds command execution options to the SSH command
@@ -441,11 +444,6 @@ func addTTYAndLoggingOptions(parts *[]string, s domain.Server) {
 		case "debug3":
 			*parts = append(*parts, "-vvv")
 		}
-	}
-
-	// BatchMode option
-	if s.BatchMode == sshYes {
-		*parts = append(*parts, "-o", "BatchMode=yes")
 	}
 
 	// SessionType option (OpenSSH 8.7+)

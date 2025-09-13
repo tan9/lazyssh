@@ -87,6 +87,7 @@ type Server struct {
 	ServerAliveCountMax string
 	Compression         string
 	TCPKeepAlive        string
+	BatchMode           string // yes, no - disable all interactive prompts
 
 	// Security and cryptography settings
 	StrictHostKeyChecking string
@@ -112,6 +113,5 @@ type Server struct {
 	SetEnv  []string
 
 	// Debugging settings
-	LogLevel  string
-	BatchMode string
+	LogLevel string
 }

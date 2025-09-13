@@ -155,6 +155,8 @@ func (r *Repository) mapConnectionConfig(server *domain.Server, key, value strin
 		server.Compression = value
 	case "tcpkeepalive":
 		server.TCPKeepAlive = value
+	case "batchmode":
+		server.BatchMode = value
 	case "controlmaster":
 		server.ControlMaster = value
 	case "controlpath":
@@ -281,8 +283,6 @@ func (r *Repository) mapDebugConfig(server *domain.Server, key, value string) bo
 	switch key {
 	case "loglevel":
 		server.LogLevel = value
-	case "batchmode":
-		server.BatchMode = value
 	default:
 		return false
 	}
