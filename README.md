@@ -14,8 +14,8 @@ With lazyssh, you can quickly navigate, connect, manage, and transfer files betw
 
 ### Server Management
 - 📜 Read & display servers from your `~/.ssh/config` in a scrollable list.
-- ➕ Add a new server from the UI by specifying alias, host/IP, username, port, identity file.
-- ✏ Edit existing server entries directly from the UI.
+- ➕ Add a new server from the UI with comprehensive SSH configuration options.
+- ✏ Edit existing server entries directly from the UI with a tabbed interface.
 - 🗑 Delete server entries safely.
 - 📌 Pin / unpin servers to keep favorites at the top.
 - 🏓 Ping server to check status.
@@ -26,10 +26,17 @@ With lazyssh, you can quickly navigate, connect, manage, and transfer files betw
 - 🏷 Tag servers (e.g., prod, dev, test) for quick filtering.
 - ↕️ Sort by alias or last SSH (toggle + reverse).
 
+### Advanced SSH Configuration
+- 🔗 Port forwarding (LocalForward, RemoteForward, DynamicForward).
+- 🚀 Connection multiplexing for faster subsequent connections.
+- 🔐 Advanced authentication options (public key, password, agent forwarding).
+- 🔒 Security settings (ciphers, MACs, key exchange algorithms).
+- 🌐 Proxy settings (ProxyJump, ProxyCommand).
+- ⚙️ Extensive SSH config options organized in tabbed interface.
+
 
 ### Upcoming
 - 📁 Copy files between local and servers with an easy picker UI.
-- 📡 Port forwarding (local↔remote) from the UI.
 - 🔑 Enhanced Key Management:
     - Use default local public key (`~/.ssh/id_ed25519.pub` or `~/.ssh/id_rsa.pub`)
     - Paste custom public keys manually
@@ -78,10 +85,15 @@ Fuzzy search functionality to quickly find servers by name, IP address, or tags
 
 ---
 
-### ➕ Add Server
+### ➕ Add/Edit Server
 <img src="./docs/add server.png" alt="Add a new server" width="900" />
 
-User-friendly form interface for adding new SSH connections.
+Tabbed interface for managing SSH connections with extensive configuration options organized into:
+- **Basic** - Host, user, port, keys, tags
+- **Connection** - Proxy, timeouts, multiplexing
+- **Forwarding** - Port forwarding, X11, agent
+- **Authentication** - Keys, passwords, methods
+- **Advanced** - Security, cryptography, debugging
 
 ---
 
@@ -154,6 +166,14 @@ make run
 | s     | Toggle sort field             |
 | S     | Reverse sort order            |
 | q     | Quit                          |
+
+**In Server Form:**
+| Key    | Action               |
+| ------ | -------------------- |
+| Ctrl+H | Previous tab         |
+| Ctrl+L | Next tab             |
+| Ctrl+S | Save                 |
+| Esc    | Cancel               |
 
 Tip: The hint bar at the top of the list shows the most useful shortcuts.
 
