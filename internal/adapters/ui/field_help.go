@@ -680,9 +680,17 @@ var fieldHelpData = map[string]FieldHelp{
 	},
 }
 
-// GetFieldCategory returns all fields in a specific category
+// GetFieldsByCategory returns all fields in a specific category
 func GetFieldsByCategory(category string) []string {
-	var fields []string
+	// Pre-count to allocate correct capacity
+	count := 0
+	for _, help := range fieldHelpData {
+		if help.Category == category {
+			count++
+		}
+	}
+
+	fields := make([]string, 0, count)
 	for name, help := range fieldHelpData {
 		if help.Category == category {
 			fields = append(fields, name)

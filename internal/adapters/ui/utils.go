@@ -193,52 +193,46 @@ func BuildSSHCommand(s domain.Server) string {
 	return strings.Join(parts, " ")
 }
 
+// addOption adds an SSH option in the format "-o Key=Value" if value is not empty
+func addOption(parts *[]string, key, value string) {
+	if value != "" {
+		*parts = append(*parts, "-o", fmt.Sprintf("%s=%s", key, value))
+	}
+}
+
+// addQuotedOption adds an SSH option with quoted value if needed
+func addQuotedOption(parts *[]string, key, value string) {
+	if value != "" {
+		*parts = append(*parts, "-o", fmt.Sprintf("%s=%s", key, quoteIfNeeded(value)))
+	}
+}
+
 // addProxyOptions adds proxy-related options to the SSH command
 func addProxyOptions(parts *[]string, s domain.Server) {
 	if s.ProxyJump != "" {
 		*parts = append(*parts, "-J", quoteIfNeeded(s.ProxyJump))
 	}
-	if s.ProxyCommand != "" {
-		*parts = append(*parts, "-o", fmt.Sprintf("ProxyCommand=%s", quoteIfNeeded(s.ProxyCommand)))
-	}
+	addQuotedOption(parts, "ProxyCommand", s.ProxyCommand)
 }
 
 // addConnectionTimingOptions adds connection timing options to the SSH command
 func addConnectionTimingOptions(parts *[]string, s domain.Server) {
-	if s.ConnectTimeout != "" {
-		*parts = append(*parts, "-o", fmt.Sprintf("ConnectTimeout=%s", s.ConnectTimeout))
-	}
-	if s.ConnectionAttempts != "" {
-		*parts = append(*parts, "-o", fmt.Sprintf("ConnectionAttempts=%s", s.ConnectionAttempts))
-	}
+	addOption(parts, "ConnectTimeout", s.ConnectTimeout)
+	addOption(parts, "ConnectionAttempts", s.ConnectionAttempts)
 	if s.BindAddress != "" {
 		*parts = append(*parts, "-b", s.BindAddress)
 	}
 	if s.BindInterface != "" {
 		*parts = append(*parts, "-B", s.BindInterface)
 	}
-	if s.AddressFamily != "" {
-		*parts = append(*parts, "-o", fmt.Sprintf("AddressFamily=%s", s.AddressFamily))
-	}
-	if s.IPQoS != "" {
-		*parts = append(*parts, "-o", fmt.Sprintf("IPQoS=%s", s.IPQoS))
-	}
+	addOption(parts, "AddressFamily", s.AddressFamily)
+	addOption(parts, "IPQoS", s.IPQoS)
 	// Hostname canonicalization options
-	if s.CanonicalizeHostname != "" {
-		*parts = append(*parts, "-o", fmt.Sprintf("CanonicalizeHostname=%s", s.CanonicalizeHostname))
-	}
-	if s.CanonicalDomains != "" {
-		*parts = append(*parts, "-o", fmt.Sprintf("CanonicalDomains=%s", s.CanonicalDomains))
-	}
-	if s.CanonicalizeFallbackLocal != "" {
-		*parts = append(*parts, "-o", fmt.Sprintf("CanonicalizeFallbackLocal=%s", s.CanonicalizeFallbackLocal))
-	}
-	if s.CanonicalizeMaxDots != "" {
-		*parts = append(*parts, "-o", fmt.Sprintf("CanonicalizeMaxDots=%s", s.CanonicalizeMaxDots))
-	}
-	if s.CanonicalizePermittedCNAMEs != "" {
-		*parts = append(*parts, "-o", fmt.Sprintf("CanonicalizePermittedCNAMEs=%s", quoteIfNeeded(s.CanonicalizePermittedCNAMEs)))
-	}
+	addOption(parts, "CanonicalizeHostname", s.CanonicalizeHostname)
+	addOption(parts, "CanonicalDomains", s.CanonicalDomains)
+	addOption(parts, "CanonicalizeFallbackLocal", s.CanonicalizeFallbackLocal)
+	addOption(parts, "CanonicalizeMaxDots", s.CanonicalizeMaxDots)
+	addQuotedOption(parts, "CanonicalizePermittedCNAMEs", s.CanonicalizePermittedCNAMEs)
 }
 
 // addPortForwardingOptions adds port forwarding options to the SSH command

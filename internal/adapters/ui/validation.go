@@ -91,6 +91,12 @@ func (v *ValidationState) GetAllErrors() []string {
 		"NumberOfPasswordPrompts", "CanonicalizeMaxDots", "EscapeChar",
 	}
 
+	// Create a set for O(1) lookups
+	fieldOrderSet := make(map[string]bool, len(fieldOrder))
+	for _, field := range fieldOrder {
+		fieldOrderSet[field] = true
+	}
+
 	errors := make([]string, 0, len(v.errors))
 
 	// Add errors in defined order
@@ -102,14 +108,7 @@ func (v *ValidationState) GetAllErrors() []string {
 
 	// Add any other errors not in the defined order
 	for field, err := range v.errors {
-		found := false
-		for _, orderedField := range fieldOrder {
-			if field == orderedField {
-				found = true
-				break
-			}
-		}
-		if !found {
+		if !fieldOrderSet[field] {
 			errors = append(errors, fmt.Sprintf("%s: %s", field, err))
 		}
 	}

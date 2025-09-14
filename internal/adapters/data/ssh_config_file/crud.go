@@ -200,6 +200,20 @@ func (r *Repository) addKVNodeIfNotEmpty(host *ssh_config.Host, key, value strin
 	host.Nodes = append(host.Nodes, kvNode)
 }
 
+// removeNodesByKey removes all nodes with the specified key from the nodes slice
+func removeNodesByKey(nodes []ssh_config.Node, key string) []ssh_config.Node {
+	filtered := make([]ssh_config.Node, 0, len(nodes))
+	for _, node := range nodes {
+		if kv, ok := node.(*ssh_config.KV); ok {
+			if strings.EqualFold(kv.Key, key) {
+				continue // skip nodes with matching key
+			}
+		}
+		filtered = append(filtered, node)
+	}
+	return filtered
+}
+
 // updateHostNodes updates the nodes of an existing host with new server details.
 func (r *Repository) updateHostNodes(host *ssh_config.Host, newServer domain.Server) {
 	// Handle Port specially - don't include if it's the default (22)
@@ -284,47 +298,33 @@ func (r *Repository) updateHostNodes(host *ssh_config.Host, newServer domain.Ser
 		}
 	}
 
-	// Helper to remove all instances of a key
-	removeKey := func(nodes []ssh_config.Node, key string) []ssh_config.Node {
-		filtered := make([]ssh_config.Node, 0, len(nodes))
-		for _, node := range nodes {
-			if kv, ok := node.(*ssh_config.KV); ok {
-				if strings.EqualFold(kv.Key, key) {
-					continue
-				}
-			}
-			filtered = append(filtered, node)
-		}
-		return filtered
-	}
-
 	// Replace multi-value entries entirely to reflect the new state
-	host.Nodes = removeKey(host.Nodes, "IdentityFile")
+	host.Nodes = removeNodesByKey(host.Nodes, "IdentityFile")
 	for _, identityFile := range newServer.IdentityFiles {
 		r.addKVNodeIfNotEmpty(host, "IdentityFile", identityFile)
 	}
 
-	host.Nodes = removeKey(host.Nodes, "LocalForward")
+	host.Nodes = removeNodesByKey(host.Nodes, "LocalForward")
 	for _, forward := range newServer.LocalForward {
 		r.addKVNodeIfNotEmpty(host, "LocalForward", forward)
 	}
 
-	host.Nodes = removeKey(host.Nodes, "RemoteForward")
+	host.Nodes = removeNodesByKey(host.Nodes, "RemoteForward")
 	for _, forward := range newServer.RemoteForward {
 		r.addKVNodeIfNotEmpty(host, "RemoteForward", forward)
 	}
 
-	host.Nodes = removeKey(host.Nodes, "DynamicForward")
+	host.Nodes = removeNodesByKey(host.Nodes, "DynamicForward")
 	for _, forward := range newServer.DynamicForward {
 		r.addKVNodeIfNotEmpty(host, "DynamicForward", forward)
 	}
 
-	host.Nodes = removeKey(host.Nodes, "SendEnv")
+	host.Nodes = removeNodesByKey(host.Nodes, "SendEnv")
 	for _, env := range newServer.SendEnv {
 		r.addKVNodeIfNotEmpty(host, "SendEnv", env)
 	}
 
-	host.Nodes = removeKey(host.Nodes, "SetEnv")
+	host.Nodes = removeNodesByKey(host.Nodes, "SetEnv")
 	for _, env := range newServer.SetEnv {
 		r.addKVNodeIfNotEmpty(host, "SetEnv", env)
 	}
