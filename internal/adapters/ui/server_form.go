@@ -468,10 +468,8 @@ func (sf *ServerForm) updateHelp(fieldName string) {
 
 // escapeForTview escapes special characters for tview display
 func escapeForTview(text string) string {
-	// Escape square brackets which are used for color/style tags in tview
-	text = strings.ReplaceAll(text, "[", "\\[")
-	text = strings.ReplaceAll(text, "]", "\\]")
-	return text
+	// Use tview's own Escape function to properly escape text
+	return tview.Escape(text)
 }
 
 // formatDetailedHelp formats detailed help content for a field
@@ -492,16 +490,16 @@ func (sf *ServerForm) formatDetailedHelp(help *FieldHelp) string {
 	b.WriteString(fmt.Sprintf("[yellow::b]📖 %s[-::-]\n", help.Field))
 	b.WriteString("[#444444]" + strings.Repeat("─", separatorWidth) + "[-]\n\n")
 
-	// Description
+	// Description - needs escaping as it might contain brackets
 	b.WriteString(fmt.Sprintf("%s\n\n", escapeForTview(help.Description)))
 
-	// Syntax
+	// Syntax - needs escaping as it often contains brackets like [user@]
 	if help.Syntax != "" {
 		b.WriteString("[cyan]Syntax:[-] ")
 		b.WriteString(fmt.Sprintf("%s\n\n", escapeForTview(help.Syntax)))
 	}
 
-	// Examples
+	// Examples - needs escaping as they might contain special characters
 	if len(help.Examples) > 0 {
 		b.WriteString("[cyan]Examples:[-]\n")
 		for _, ex := range help.Examples {
@@ -510,12 +508,12 @@ func (sf *ServerForm) formatDetailedHelp(help *FieldHelp) string {
 		b.WriteString("\n")
 	}
 
-	// Default value
+	// Default value - already processed by formatDefaultValue, no additional escaping needed
 	if help.Default != "" {
-		b.WriteString(fmt.Sprintf("[dim]Default: %s[-]\n", escapeForTview(help.Default)))
+		b.WriteString(fmt.Sprintf("[dim]Default: %s[-]\n", help.Default))
 	}
 
-	// Version info
+	// Version info - unlikely to contain brackets, but escape for safety
 	if help.Since != "" {
 		b.WriteString(fmt.Sprintf("[dim]Available since: %s[-]\n", escapeForTview(help.Since)))
 	}
