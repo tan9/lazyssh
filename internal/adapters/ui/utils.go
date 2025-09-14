@@ -562,3 +562,79 @@ func GetAvailableSSHKeys() []string {
 
 	return keys
 }
+
+// GetAvailableKnownHostsFiles returns a list of available known_hosts files in common locations.
+// It safely handles file permission issues and only returns readable files.
+func GetAvailableKnownHostsFiles() []string {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return []string{}
+	}
+
+	files := []string{}
+
+	// Common known_hosts file locations to check
+	commonPaths := []string{
+		filepath.Join(homeDir, ".ssh", "known_hosts"),
+		filepath.Join(homeDir, ".ssh", "known_hosts2"),
+		filepath.Join(homeDir, ".ssh", "known_hosts.old"),
+		"/etc/ssh/ssh_known_hosts",
+		"/etc/ssh/ssh_known_hosts2",
+	}
+
+	// Check each common location
+	for _, path := range commonPaths {
+		if info, err := os.Stat(path); err == nil && !info.IsDir() {
+			// Check if file is readable
+			// #nosec G304 - path is constructed from known safe values
+			if file, err := os.Open(path); err == nil {
+				_ = file.Close()
+				// Convert to user-friendly path with tilde notation
+				if strings.HasPrefix(path, homeDir) {
+					relPath := strings.TrimPrefix(path, homeDir)
+					files = append(files, "~"+relPath)
+				} else {
+					files = append(files, path)
+				}
+			}
+		}
+	}
+
+	// Also check for any other files in .ssh directory that might be known_hosts files
+	sshDir := filepath.Join(homeDir, ".ssh")
+	entries, err := os.ReadDir(sshDir)
+	if err == nil {
+		for _, entry := range entries {
+			if entry.IsDir() {
+				continue
+			}
+
+			name := entry.Name()
+			// Look for files that might be known_hosts variants
+			if strings.Contains(name, "known_hosts") && !strings.HasSuffix(name, ".pub") {
+				// Skip if already added from common paths
+				fullPath := filepath.Join(sshDir, name)
+				tildeNotation := "~/.ssh/" + name
+
+				alreadyAdded := false
+				for _, existing := range files {
+					if existing == tildeNotation {
+						alreadyAdded = true
+						break
+					}
+				}
+
+				if !alreadyAdded {
+					// Check if readable
+					// #nosec G304 - fullPath is constructed from safe directory enumeration
+					if file, err := os.Open(fullPath); err == nil {
+						_ = file.Close()
+						files = append(files, tildeNotation)
+					}
+				}
+			}
+		}
+	}
+
+	return files
+}

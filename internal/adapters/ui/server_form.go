@@ -777,6 +777,83 @@ func (sf *ServerForm) createSSHKeyAutocomplete() func(string) []string {
 	}
 }
 
+// createKnownHostsAutocomplete creates an autocomplete function for known_hosts file paths
+func (sf *ServerForm) createKnownHostsAutocomplete() func(string) []string {
+	return func(currentText string) []string {
+		if currentText == "" {
+			// Show available known_hosts files when field is empty
+			availableFiles := GetAvailableKnownHostsFiles()
+			if len(availableFiles) == 0 {
+				return nil
+			}
+			return availableFiles
+		}
+
+		// Split by space to handle multiple files
+		files := strings.Split(currentText, " ")
+		lastFile := strings.TrimSpace(files[len(files)-1])
+
+		// If the last file is empty (after a space), show all available files
+		if lastFile == "" {
+			availableFiles := GetAvailableKnownHostsFiles()
+			if len(availableFiles) == 0 {
+				return nil
+			}
+			// Build suggestions with existing files
+			var suggestions []string
+			prefix := ""
+			if len(files) > 1 {
+				// Join all files except the last empty one
+				existingFiles := files[:len(files)-1]
+				for i := range existingFiles {
+					existingFiles[i] = strings.TrimSpace(existingFiles[i])
+				}
+				prefix = strings.Join(existingFiles, " ") + " "
+			}
+			for _, file := range availableFiles {
+				suggestions = append(suggestions, prefix+file)
+			}
+			return suggestions
+		}
+
+		// Get available files and filter based on what's being typed
+		availableFiles := GetAvailableKnownHostsFiles()
+		if len(availableFiles) == 0 {
+			return nil
+		}
+
+		// Convert to lowercase for case-insensitive matching
+		searchTerm := strings.ToLower(lastFile)
+
+		// Filter available files
+		var filtered []string
+		prefix := ""
+		if len(files) > 1 {
+			// Join all files except the last one being typed
+			existingFiles := files[:len(files)-1]
+			for i := range existingFiles {
+				existingFiles[i] = strings.TrimSpace(existingFiles[i])
+			}
+			prefix = strings.Join(existingFiles, " ") + " "
+		}
+
+		for _, file := range availableFiles {
+			lowerFile := strings.ToLower(file)
+			// Check if the file matches the search term
+			if strings.Contains(lowerFile, searchTerm) || matchesSequence(lowerFile, searchTerm) {
+				filtered = append(filtered, prefix+file)
+			}
+		}
+
+		// If no matches found, return nil to allow Tab navigation
+		if len(filtered) == 0 {
+			return nil
+		}
+
+		return filtered
+	}
+}
+
 // createAlgorithmAutocomplete creates an autocomplete function for algorithm input fields
 func (sf *ServerForm) createAlgorithmAutocomplete(suggestions []string) func(string) []string {
 	return func(currentText string) []string {
@@ -1521,7 +1598,9 @@ func (sf *ServerForm) createAdvancedForm() {
 	visualHostKeyIndex := sf.findOptionIndex(visualHostKeyOptions, defaultValues.VisualHostKey)
 	sf.addDropDownWithHelp(form, "VisualHostKey:", "VisualHostKey", visualHostKeyOptions, visualHostKeyIndex)
 
-	sf.addInputFieldWithHelp(form, "UserKnownHostsFile:", "UserKnownHostsFile", defaultValues.UserKnownHostsFile, 40, GetFieldPlaceholder("UserKnownHostsFile"))
+	// UserKnownHostsFile field with autocomplete
+	knownHostsField := sf.addInputFieldWithHelp(form, "UserKnownHostsFile:", "UserKnownHostsFile", defaultValues.UserKnownHostsFile, 40, GetFieldPlaceholder("UserKnownHostsFile"))
+	knownHostsField.SetAutocompleteFunc(sf.createKnownHostsAutocomplete())
 
 	form.AddTextView("\n[yellow]▶ Cryptography[-]", "", 0, 1, true, false)
 
