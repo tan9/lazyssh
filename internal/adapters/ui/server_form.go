@@ -1966,10 +1966,10 @@ func (sf *ServerForm) handleCancel() {
 		if sf.app != nil {
 			modal := tview.NewModal().
 				SetText("You have unsaved changes. Are you sure you want to exit?").
-				AddButtons([]string{"(S)ave", "(D)iscard", "(C)ancel"}).
+				AddButtons([]string{"[yellow]S[-]ave", "[yellow]D[-]iscard", "[yellow]C[-]ancel"}).
 				SetDoneFunc(func(buttonIndex int, buttonLabel string) {
-					switch buttonLabel {
-					case "(S)ave":
+					switch buttonIndex {
+					case 0: // Save
 						// Try to save, if successful it will exit
 						if sf.handleSave() {
 							// Save successful, modal will be replaced by onSave callback
@@ -1977,11 +1977,11 @@ func (sf *ServerForm) handleCancel() {
 							// Validation failed, return to form
 							sf.app.SetRoot(sf.Flex, true)
 						}
-					case "(D)iscard":
+					case 1: // Discard
 						if sf.onCancel != nil {
 							sf.onCancel()
 						}
-					case "(C)ancel":
+					case 2: // Cancel
 						// Restore the form view
 						sf.app.SetRoot(sf.Flex, true)
 					}

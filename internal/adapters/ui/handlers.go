@@ -312,7 +312,7 @@ func (t *tui) showDeleteConfirmModal(server domain.Server) {
 
 	modal := tview.NewModal().
 		SetText(msg).
-		AddButtons([]string{"Cancel", "Confirm"}).
+		AddButtons([]string{"[yellow]C[-]ancel", "[yellow]D[-]elete"}).
 		SetDoneFunc(func(buttonIndex int, buttonLabel string) {
 			if buttonIndex == 1 {
 				_ = t.serverService.DeleteServer(server)
@@ -320,6 +320,24 @@ func (t *tui) showDeleteConfirmModal(server domain.Server) {
 			}
 			t.handleModalClose()
 		})
+
+	// Add keyboard shortcuts for the modal
+	modal.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		switch event.Rune() {
+		case 'c', 'C':
+			// Cancel
+			t.handleModalClose()
+			return nil
+		case 'd', 'D':
+			// Delete
+			_ = t.serverService.DeleteServer(server)
+			t.refreshServerList()
+			t.handleModalClose()
+			return nil
+		}
+		// ESC key already handled by default modal behavior
+		return event
+	})
 
 	t.app.SetRoot(modal, true)
 }
