@@ -97,35 +97,55 @@ const (
 )
 
 type ServerForm struct {
-	*tview.Flex             // The root container (includes header, form panel and hint bar)
-	header      *AppHeader  // The app header
-	formPanel   *tview.Flex // The actual form panel
-	pages       *tview.Pages
-	tabBar      *tview.TextView
-	forms       map[string]*tview.Form
-	currentTab  string
-	tabs        []string
-	tabAbbrev   map[string]string // Abbreviated tab names for narrow views
-	mode        ServerFormMode
-	original    *domain.Server
-	onSave      func(domain.Server, *domain.Server)
-	onCancel    func()
-	app         *tview.Application // Reference to app for showing modals
-	version     string             // Version for header
-	commit      string             // Commit for header
-	validation  *ValidationState   // Validation state for all fields
+	*tview.Flex               // The root container (includes header, form panel and hint bar)
+	header        *AppHeader  // The app header
+	formPanel     *tview.Flex // The actual form panel
+	pages         *tview.Pages
+	tabBar        *tview.TextView
+	forms         map[string]*tview.Form
+	currentTab    string
+	tabs          []string
+	tabAbbrev     map[string]string // Abbreviated tab names for narrow views
+	mode          ServerFormMode
+	original      *domain.Server
+	onSave        func(domain.Server, *domain.Server)
+	onCancel      func()
+	app           *tview.Application // Reference to app for showing modals
+	version       string             // Version for header
+	commit        string             // Commit for header
+	validation    *ValidationState   // Validation state for all fields
+	helpPanel     *tview.TextView    // Help panel for field descriptions
+	helpMode      HelpDisplayMode    // Current help display mode
+	currentField  string             // Currently focused field
+	mainContainer *tview.Flex        // Container for form and help panel
 }
 
 func NewServerForm(mode ServerFormMode, original *domain.Server) *ServerForm {
+	// Create help panel
+	helpPanel := tview.NewTextView().
+		SetDynamicColors(true).
+		SetWordWrap(true).
+		SetScrollable(true)
+	helpPanel.SetBorder(true).
+		SetBorderPadding(0, 0, 1, 1).
+		SetTitle(" Help ").
+		SetTitleAlign(tview.AlignLeft)
+
+	// Create main container for form and help
+	mainContainer := tview.NewFlex().SetDirection(tview.FlexColumn)
+
 	form := &ServerForm{
-		Flex:       tview.NewFlex().SetDirection(tview.FlexRow),
-		formPanel:  tview.NewFlex().SetDirection(tview.FlexRow),
-		pages:      tview.NewPages(),
-		tabBar:     tview.NewTextView().SetDynamicColors(true).SetTextAlign(tview.AlignCenter).SetRegions(true),
-		forms:      make(map[string]*tview.Form),
-		mode:       mode,
-		original:   original,
-		validation: NewValidationState(),
+		Flex:          tview.NewFlex().SetDirection(tview.FlexRow),
+		formPanel:     tview.NewFlex().SetDirection(tview.FlexRow),
+		pages:         tview.NewPages(),
+		tabBar:        tview.NewTextView().SetDynamicColors(true).SetTextAlign(tview.AlignCenter).SetRegions(true),
+		forms:         make(map[string]*tview.Form),
+		mode:          mode,
+		original:      original,
+		validation:    NewValidationState(),
+		helpPanel:     helpPanel,
+		helpMode:      HelpModeNormal, // Show help panel by default
+		mainContainer: mainContainer,
 		tabs: []string{
 			"Basic",
 			"Connection",
@@ -172,6 +192,37 @@ func (sf *ServerForm) build() {
 	sf.formPanel.AddItem(sf.tabBar, 1, 0, false).
 		AddItem(sf.pages, 0, 1, true)
 
+	// Setup main container with form and help panel
+	sf.mainContainer.Clear()
+
+	// Responsive layout: hide help panel if window is too narrow
+	sf.mainContainer.SetDrawFunc(func(screen tcell.Screen, x, y, width, height int) (int, int, int, int) {
+		// Minimum width for showing help panel
+		minWidthForHelp := 120
+
+		// Clear and rebuild based on width
+		sf.mainContainer.Clear()
+
+		if width < minWidthForHelp || sf.helpMode == HelpModeOff {
+			// Window too narrow or help is off - only show form
+			sf.mainContainer.AddItem(sf.formPanel, 0, 1, true)
+		} else {
+			// Window wide enough - show both form and help
+			sf.mainContainer.AddItem(sf.formPanel, 0, 3, true)
+			sf.mainContainer.AddItem(sf.helpPanel, 0, 2, false)
+			// Refresh help content to recalculate separator width on resize
+			sf.updateHelp(sf.currentField)
+		}
+
+		return x, y, width, height
+	})
+
+	// Initial setup
+	sf.mainContainer.AddItem(sf.formPanel, 0, 3, true)
+	if sf.helpMode != HelpModeOff {
+		sf.mainContainer.AddItem(sf.helpPanel, 0, 2, false)
+	}
+
 	// Create hint bar with same background as main screen's status bar
 	hintBar := tview.NewTextView().SetDynamicColors(true)
 	hintBar.SetBackgroundColor(tcell.Color235)
@@ -180,8 +231,11 @@ func (sf *ServerForm) build() {
 
 	// Setup main container - header at top, hint bar at bottom
 	sf.Flex.AddItem(sf.header, 2, 0, false).
-		AddItem(sf.formPanel, 0, 1, true).
+		AddItem(sf.mainContainer, 0, 1, true).
 		AddItem(hintBar, 1, 0, false)
+
+	// Initialize help with first field
+	sf.updateHelp("Alias")
 
 	// Setup keyboard shortcuts
 	sf.setupKeyboardShortcuts()
@@ -425,9 +479,103 @@ func (sf *ServerForm) prevTab() {
 	}
 }
 
+// updateHelp updates the help panel with information for the given field
+func (sf *ServerForm) updateHelp(fieldName string) {
+	if sf.helpPanel == nil || sf.helpMode == HelpModeOff {
+		return
+	}
+
+	sf.currentField = fieldName
+	help := GetFieldHelp(fieldName)
+	if help == nil {
+		sf.helpPanel.SetText("[dim]No help available for this field[-]")
+		return
+	}
+
+	var content string
+	if sf.helpMode == HelpModeCompact {
+		// Compact mode: single line
+		example := ""
+		if len(help.Examples) > 0 {
+			example = help.Examples[0]
+		}
+		content = fmt.Sprintf("[yellow]%s:[-] %s", help.Field, escapeForTview(help.Description))
+		if example != "" {
+			content += fmt.Sprintf(" [dim](e.g., %s)[-]", escapeForTview(example))
+		}
+	} else {
+		// Normal/Full mode: detailed help
+		content = sf.formatDetailedHelp(help)
+	}
+
+	sf.helpPanel.SetText(content)
+}
+
+// escapeForTview escapes special characters for tview display
+func escapeForTview(text string) string {
+	// Escape square brackets which are used for color/style tags in tview
+	text = strings.ReplaceAll(text, "[", "\\[")
+	text = strings.ReplaceAll(text, "]", "\\]")
+	return text
+}
+
+// formatDetailedHelp formats detailed help content for a field
+func (sf *ServerForm) formatDetailedHelp(help *FieldHelp) string {
+	var b strings.Builder
+
+	// Calculate separator width dynamically
+	// Get the actual width of the help panel if possible
+	separatorWidth := 40 // Default width
+	if sf.helpPanel != nil {
+		_, _, width, _ := sf.helpPanel.GetInnerRect()
+		if width > 0 {
+			separatorWidth = width // Fill entire width
+		}
+	}
+
+	// Title with field name and separator below
+	b.WriteString(fmt.Sprintf("[yellow::b]📖 %s[-::-]\n", help.Field))
+	b.WriteString("[#444444]" + strings.Repeat("─", separatorWidth) + "[-]\n\n")
+
+	// Description
+	b.WriteString(fmt.Sprintf("%s\n\n", escapeForTview(help.Description)))
+
+	// Syntax
+	if help.Syntax != "" {
+		b.WriteString("[cyan]Syntax:[-] ")
+		b.WriteString(fmt.Sprintf("%s\n\n", escapeForTview(help.Syntax)))
+	}
+
+	// Examples
+	if len(help.Examples) > 0 {
+		b.WriteString("[cyan]Examples:[-]\n")
+		for _, ex := range help.Examples {
+			b.WriteString(fmt.Sprintf("  • %s\n", escapeForTview(ex)))
+		}
+		b.WriteString("\n")
+	}
+
+	// Default value
+	if help.Default != "" {
+		b.WriteString(fmt.Sprintf("[dim]Default: %s[-]\n", escapeForTview(help.Default)))
+	}
+
+	// Version info
+	if help.Since != "" {
+		b.WriteString(fmt.Sprintf("[dim]Available since: %s[-]\n", escapeForTview(help.Since)))
+	}
+
+	return b.String()
+}
+
+// Note: toggleHelp and rebuildLayout were removed due to hang issues
+// The help panel is now always visible on the right side
+
 func (sf *ServerForm) setupKeyboardShortcuts() {
 	// Set input capture for the main flex container
 	sf.Flex.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		// Help panel is always visible - no toggle needed
+
 		// Check for Ctrl key combinations with regular keys
 		if event.Key() == tcell.KeyRune && event.Modifiers()&tcell.ModCtrl != 0 {
 			switch event.Rune() {
@@ -771,6 +919,41 @@ func (sf *ServerForm) validateField(fieldName, value string) string {
 	return ""
 }
 
+// addDropDownWithHelp adds a dropdown field with help support
+func (sf *ServerForm) addDropDownWithHelp(form *tview.Form, label, fieldName string, options []string, initialOption int) {
+	dropdown := tview.NewDropDown().
+		SetLabel(label).
+		SetOptions(options, nil).
+		SetCurrentOption(initialOption)
+
+	// Add focus handler to show help
+	dropdown.SetFocusFunc(func() {
+		sf.updateHelp(fieldName)
+	})
+
+	form.AddFormItem(dropdown)
+}
+
+// addInputFieldWithHelp adds a regular input field with help support
+func (sf *ServerForm) addInputFieldWithHelp(form *tview.Form, label, fieldName, defaultValue string, width int, placeholder string) *tview.InputField {
+	field := tview.NewInputField().
+		SetLabel(label).
+		SetText(defaultValue).
+		SetFieldWidth(width)
+
+	if placeholder != "" {
+		field.SetPlaceholder(placeholder)
+	}
+
+	// Add focus handler to show help
+	field.SetFocusFunc(func() {
+		sf.updateHelp(fieldName)
+	})
+
+	form.AddFormItem(field)
+	return field
+}
+
 // addValidatedInputField adds an input field with real-time validation
 func (sf *ServerForm) addValidatedInputField(form *tview.Form, label, fieldName, defaultValue string, width int, placeholder string) *tview.InputField {
 	// Store the original label without color tags
@@ -794,6 +977,11 @@ func (sf *ServerForm) addValidatedInputField(form *tview.Form, label, fieldName,
 			// Clear error indication, restore original label
 			field.SetLabel(originalLabel)
 		}
+	})
+
+	// Add focus handler to show help
+	field.SetFocusFunc(func() {
+		sf.updateHelp(fieldName)
 	})
 
 	// Validate on blur (when field loses focus)
@@ -983,19 +1171,19 @@ func (sf *ServerForm) createConnectionForm() {
 	defaultValues := sf.getDefaultValues()
 
 	form.AddTextView("\n[yellow]▶ Proxy & Command[-]", "", 0, 1, true, false)
-	form.AddInputField("ProxyJump:", defaultValues.ProxyJump, 40, nil, nil)
-	form.AddInputField("ProxyCommand:", defaultValues.ProxyCommand, 40, nil, nil)
-	form.AddInputField("RemoteCommand:", defaultValues.RemoteCommand, 40, nil, nil)
+	sf.addInputFieldWithHelp(form, "ProxyJump:", "ProxyJump", defaultValues.ProxyJump, 40, "")
+	sf.addInputFieldWithHelp(form, "ProxyCommand:", "ProxyCommand", defaultValues.ProxyCommand, 40, "")
+	sf.addInputFieldWithHelp(form, "RemoteCommand:", "RemoteCommand", defaultValues.RemoteCommand, 40, "")
 
 	// RequestTTY dropdown
 	requestTTYOptions := createOptionsWithDefault("RequestTTY", []string{"", "yes", "no", "force", "auto"})
 	requestTTYIndex := sf.findOptionIndex(requestTTYOptions, defaultValues.RequestTTY)
-	form.AddDropDown("RequestTTY:", requestTTYOptions, requestTTYIndex, nil)
+	sf.addDropDownWithHelp(form, "RequestTTY:", "RequestTTY", requestTTYOptions, requestTTYIndex)
 
 	// SessionType dropdown (OpenSSH 8.7+)
 	sessionTypeOptions := createOptionsWithDefault("SessionType", []string{"", "none (-N)", "subsystem (-s)", "default"})
 	sessionTypeIndex := sf.findOptionIndex(sessionTypeOptions, defaultValues.SessionType)
-	form.AddDropDown("SessionType:", sessionTypeOptions, sessionTypeIndex, nil)
+	sf.addDropDownWithHelp(form, "SessionType:", "SessionType", sessionTypeOptions, sessionTypeIndex)
 
 	form.AddTextView("\n[yellow]▶ Connection Settings[-]", "", 0, 1, true, false)
 	sf.addValidatedInputField(form, "ConnectTimeout:", "ConnectTimeout", defaultValues.ConnectTimeout, 10, "seconds (default: none)")
@@ -1005,7 +1193,7 @@ func (sf *ServerForm) createConnectionForm() {
 	// BatchMode dropdown (moved from Keep-Alive)
 	batchModeOptions := createOptionsWithDefault("BatchMode", []string{"", "yes", "no"})
 	batchModeIndex := sf.findOptionIndex(batchModeOptions, defaultValues.BatchMode)
-	form.AddDropDown("BatchMode:", batchModeOptions, batchModeIndex, nil)
+	sf.addDropDownWithHelp(form, "BatchMode:", "BatchMode", batchModeOptions, batchModeIndex)
 
 	form.AddTextView("\n[yellow]▶ Bind Options[-]", "", 0, 1, true, false)
 	sf.addValidatedInputField(form, "BindAddress:", "BindAddress", defaultValues.BindAddress, 40, "IP, hostname, * (all), or localhost")
@@ -1013,40 +1201,30 @@ func (sf *ServerForm) createConnectionForm() {
 	// BindInterface dropdown with available network interfaces
 	interfaceOptions := append([]string{""}, GetNetworkInterfaces()...)
 	bindInterfaceIndex := sf.findOptionIndex(interfaceOptions, defaultValues.BindInterface)
-	form.AddDropDown("BindInterface:", interfaceOptions, bindInterfaceIndex, nil)
+	sf.addDropDownWithHelp(form, "BindInterface:", "BindInterface", interfaceOptions, bindInterfaceIndex)
 
 	// AddressFamily dropdown
 	addressFamilyOptions := createOptionsWithDefault("AddressFamily", []string{"", "any", "inet", "inet6"})
 	addressFamilyIndex := sf.findOptionIndex(addressFamilyOptions, defaultValues.AddressFamily)
-	form.AddDropDown("AddressFamily:", addressFamilyOptions, addressFamilyIndex, nil)
+	sf.addDropDownWithHelp(form, "AddressFamily:", "AddressFamily", addressFamilyOptions, addressFamilyIndex)
 
 	form.AddTextView("\n[yellow]▶ Hostname Canonicalization[-]", "", 0, 1, true, false)
 
 	// CanonicalizeHostname dropdown
 	canonicalizeOptions := createOptionsWithDefault("CanonicalizeHostname", []string{"", "yes", "no", "always"})
 	canonicalizeIndex := sf.findOptionIndex(canonicalizeOptions, defaultValues.CanonicalizeHostname)
-	form.AddDropDown("CanonicalizeHostname:", canonicalizeOptions, canonicalizeIndex, nil)
+	sf.addDropDownWithHelp(form, "CanonicalizeHostname:", "CanonicalizeHostname", canonicalizeOptions, canonicalizeIndex)
 
-	canonicalDomainsField := tview.NewInputField().
-		SetLabel("CanonicalDomains:").
-		SetText(defaultValues.CanonicalDomains).
-		SetFieldWidth(40).
-		SetPlaceholder("e.g., example.com, internal.net")
-	form.AddFormItem(canonicalDomainsField)
+	sf.addInputFieldWithHelp(form, "CanonicalDomains:", "CanonicalDomains", defaultValues.CanonicalDomains, 40, "e.g., example.com, internal.net")
 
 	// CanonicalizeFallbackLocal dropdown
 	fallbackOptions := createOptionsWithDefault("CanonicalizeFallbackLocal", []string{"", "yes", "no"})
 	fallbackIndex := sf.findOptionIndex(fallbackOptions, defaultValues.CanonicalizeFallbackLocal)
-	form.AddDropDown("CanonicalizeFallbackLocal:", fallbackOptions, fallbackIndex, nil)
+	sf.addDropDownWithHelp(form, "CanonicalizeFallbackLocal:", "CanonicalizeFallbackLocal", fallbackOptions, fallbackIndex)
 
 	sf.addValidatedInputField(form, "CanonicalizeMaxDots:", "CanonicalizeMaxDots", defaultValues.CanonicalizeMaxDots, 10, "default: 1")
 
-	canonicalizePermittedCNAMEsField := tview.NewInputField().
-		SetLabel("CanonicalizePermittedCNAMEs:").
-		SetText(defaultValues.CanonicalizePermittedCNAMEs).
-		SetFieldWidth(40).
-		SetPlaceholder("e.g., *.example.com:example.net")
-	form.AddFormItem(canonicalizePermittedCNAMEsField)
+	sf.addInputFieldWithHelp(form, "CanonicalizePermittedCNAMEs:", "CanonicalizePermittedCNAMEs", defaultValues.CanonicalizePermittedCNAMEs, 40, "e.g., *.example.com:example.net")
 
 	form.AddTextView("\n[yellow]▶ Keep-Alive[-]", "", 0, 1, true, false)
 	sf.addValidatedInputField(form, "ServerAliveInterval:", "ServerAliveInterval", defaultValues.ServerAliveInterval, 10, "seconds (default: 0)")
@@ -1055,20 +1233,20 @@ func (sf *ServerForm) createConnectionForm() {
 	// Compression dropdown
 	compressionOptions := createOptionsWithDefault("Compression", []string{"", "yes", "no"})
 	compressionIndex := sf.findOptionIndex(compressionOptions, defaultValues.Compression)
-	form.AddDropDown("Compression:", compressionOptions, compressionIndex, nil)
+	sf.addDropDownWithHelp(form, "Compression:", "Compression", compressionOptions, compressionIndex)
 
 	// TCPKeepAlive dropdown
 	tcpKeepAliveOptions := createOptionsWithDefault("TCPKeepAlive", []string{"", "yes", "no"})
 	tcpKeepAliveIndex := sf.findOptionIndex(tcpKeepAliveOptions, defaultValues.TCPKeepAlive)
-	form.AddDropDown("TCPKeepAlive:", tcpKeepAliveOptions, tcpKeepAliveIndex, nil)
+	sf.addDropDownWithHelp(form, "TCPKeepAlive:", "TCPKeepAlive", tcpKeepAliveOptions, tcpKeepAliveIndex)
 
 	form.AddTextView("\n[yellow]▶ Multiplexing[-]", "", 0, 1, true, false)
 	// ControlMaster dropdown
 	controlMasterOptions := createOptionsWithDefault("ControlMaster", []string{"", "yes", "no", "auto", "ask", "autoask"})
 	controlMasterIndex := sf.findOptionIndex(controlMasterOptions, defaultValues.ControlMaster)
-	form.AddDropDown("ControlMaster:", controlMasterOptions, controlMasterIndex, nil)
-	form.AddInputField("ControlPath:", defaultValues.ControlPath, 40, nil, nil)
-	form.AddInputField("ControlPersist:", defaultValues.ControlPersist, 20, nil, nil)
+	sf.addDropDownWithHelp(form, "ControlMaster:", "ControlMaster", controlMasterOptions, controlMasterIndex)
+	sf.addInputFieldWithHelp(form, "ControlPath:", "ControlPath", defaultValues.ControlPath, 40, "")
+	sf.addInputFieldWithHelp(form, "ControlPersist:", "ControlPersist", defaultValues.ControlPersist, 20, "")
 
 	// Add save and cancel buttons
 	form.AddButton("Save", sf.handleSaveButton)
@@ -1094,34 +1272,34 @@ func (sf *ServerForm) createForwardingForm() {
 	// ClearAllForwardings dropdown
 	clearAllForwardingsOptions := createOptionsWithDefault("ClearAllForwardings", []string{"", "yes", "no"})
 	clearAllForwardingsIndex := sf.findOptionIndex(clearAllForwardingsOptions, defaultValues.ClearAllForwardings)
-	form.AddDropDown("ClearAllForwardings:", clearAllForwardingsOptions, clearAllForwardingsIndex, nil)
+	sf.addDropDownWithHelp(form, "ClearAllForwardings:", "ClearAllForwardings", clearAllForwardingsOptions, clearAllForwardingsIndex)
 
 	// ExitOnForwardFailure dropdown
 	exitOnForwardFailureOptions := createOptionsWithDefault("ExitOnForwardFailure", []string{"", "yes", "no"})
 	exitOnForwardFailureIndex := sf.findOptionIndex(exitOnForwardFailureOptions, defaultValues.ExitOnForwardFailure)
-	form.AddDropDown("ExitOnForwardFailure:", exitOnForwardFailureOptions, exitOnForwardFailureIndex, nil)
+	sf.addDropDownWithHelp(form, "ExitOnForwardFailure:", "ExitOnForwardFailure", exitOnForwardFailureOptions, exitOnForwardFailureIndex)
 
 	// GatewayPorts dropdown
 	gatewayPortsOptions := createOptionsWithDefault("GatewayPorts", []string{"", "yes", "no", "clientspecified"})
 	gatewayPortsIndex := sf.findOptionIndex(gatewayPortsOptions, defaultValues.GatewayPorts)
-	form.AddDropDown("GatewayPorts:", gatewayPortsOptions, gatewayPortsIndex, nil)
+	sf.addDropDownWithHelp(form, "GatewayPorts:", "GatewayPorts", gatewayPortsOptions, gatewayPortsIndex)
 
 	form.AddTextView("\n[yellow]▶ Agent & X11 Forwarding[-]", "", 0, 1, true, false)
 
 	// ForwardAgent dropdown
 	forwardAgentOptions := createOptionsWithDefault("ForwardAgent", []string{"", "yes", "no"})
 	forwardAgentIndex := sf.findOptionIndex(forwardAgentOptions, defaultValues.ForwardAgent)
-	form.AddDropDown("ForwardAgent:", forwardAgentOptions, forwardAgentIndex, nil)
+	sf.addDropDownWithHelp(form, "ForwardAgent:", "ForwardAgent", forwardAgentOptions, forwardAgentIndex)
 
 	// ForwardX11 dropdown
 	forwardX11Options := createOptionsWithDefault("ForwardX11", []string{"", "yes", "no"})
 	forwardX11Index := sf.findOptionIndex(forwardX11Options, defaultValues.ForwardX11)
-	form.AddDropDown("ForwardX11:", forwardX11Options, forwardX11Index, nil)
+	sf.addDropDownWithHelp(form, "ForwardX11:", "ForwardX11", forwardX11Options, forwardX11Index)
 
 	// ForwardX11Trusted dropdown
 	forwardX11TrustedOptions := createOptionsWithDefault("ForwardX11Trusted", []string{"", "yes", "no"})
 	forwardX11TrustedIndex := sf.findOptionIndex(forwardX11TrustedOptions, defaultValues.ForwardX11Trusted)
-	form.AddDropDown("ForwardX11Trusted:", forwardX11TrustedOptions, forwardX11TrustedIndex, nil)
+	sf.addDropDownWithHelp(form, "ForwardX11Trusted:", "ForwardX11Trusted", forwardX11TrustedOptions, forwardX11TrustedIndex)
 
 	// Add save and cancel buttons
 	form.AddButton("Save", sf.handleSaveButton)
@@ -1206,12 +1384,12 @@ func (sf *ServerForm) createAuthenticationForm() {
 	// PubkeyAuthentication dropdown
 	pubkeyOptions := createOptionsWithDefault("PubkeyAuthentication", []string{"", "yes", "no"})
 	pubkeyIndex := sf.findOptionIndex(pubkeyOptions, defaultValues.PubkeyAuthentication)
-	form.AddDropDown("PubkeyAuthentication:", pubkeyOptions, pubkeyIndex, nil)
+	sf.addDropDownWithHelp(form, "PubkeyAuthentication:", "PubkeyAuthentication", pubkeyOptions, pubkeyIndex)
 
 	// IdentitiesOnly dropdown - controls whether to use only specified identity files
 	identitiesOnlyOptions := createOptionsWithDefault("IdentitiesOnly", []string{"", "yes", "no"})
 	identitiesOnlyIndex := sf.findOptionIndex(identitiesOnlyOptions, defaultValues.IdentitiesOnly)
-	form.AddDropDown("IdentitiesOnly:", identitiesOnlyOptions, identitiesOnlyIndex, nil)
+	sf.addDropDownWithHelp(form, "IdentitiesOnly:", "IdentitiesOnly", identitiesOnlyOptions, identitiesOnlyIndex)
 
 	// SSH Agent settings
 	form.AddTextView("\n[yellow]▶ SSH Agent[-]", "", 0, 1, true, false)
@@ -1219,9 +1397,9 @@ func (sf *ServerForm) createAuthenticationForm() {
 	// AddKeysToAgent dropdown
 	addKeysOptions := createOptionsWithDefault("AddKeysToAgent", []string{"", "yes", "no", "ask", "confirm"})
 	addKeysIndex := sf.findOptionIndex(addKeysOptions, defaultValues.AddKeysToAgent)
-	form.AddDropDown("AddKeysToAgent:", addKeysOptions, addKeysIndex, nil)
+	sf.addDropDownWithHelp(form, "AddKeysToAgent:", "AddKeysToAgent", addKeysOptions, addKeysIndex)
 
-	form.AddInputField("IdentityAgent:", defaultValues.IdentityAgent, 40, nil, nil)
+	sf.addInputFieldWithHelp(form, "IdentityAgent:", "IdentityAgent", defaultValues.IdentityAgent, 40, "")
 
 	// Password/Interactive authentication
 	form.AddTextView("\n[yellow]▶ Password & Interactive[-]", "", 0, 1, true, false)
@@ -1229,12 +1407,12 @@ func (sf *ServerForm) createAuthenticationForm() {
 	// PasswordAuthentication dropdown
 	passwordOptions := createOptionsWithDefault("PasswordAuthentication", []string{"", "yes", "no"})
 	passwordIndex := sf.findOptionIndex(passwordOptions, defaultValues.PasswordAuthentication)
-	form.AddDropDown("PasswordAuthentication:", passwordOptions, passwordIndex, nil)
+	sf.addDropDownWithHelp(form, "PasswordAuthentication:", "PasswordAuthentication", passwordOptions, passwordIndex)
 
 	// KbdInteractiveAuthentication dropdown
 	kbdInteractiveOptions := createOptionsWithDefault("KbdInteractiveAuthentication", []string{"", "yes", "no"})
 	kbdInteractiveIndex := sf.findOptionIndex(kbdInteractiveOptions, defaultValues.KbdInteractiveAuthentication)
-	form.AddDropDown("KbdInteractiveAuthentication:", kbdInteractiveOptions, kbdInteractiveIndex, nil)
+	sf.addDropDownWithHelp(form, "KbdInteractiveAuthentication:", "KbdInteractiveAuthentication", kbdInteractiveOptions, kbdInteractiveIndex)
 
 	// NumberOfPasswordPrompts field
 	sf.addValidatedInputField(form, "NumberOfPasswordPrompts:", "NumberOfPasswordPrompts", defaultValues.NumberOfPasswordPrompts, 10, "default: 3")
@@ -1242,30 +1420,15 @@ func (sf *ServerForm) createAuthenticationForm() {
 	// Advanced: Authentication order preference
 	form.AddTextView("\n[yellow]▶ Advanced[-]", "", 0, 1, true, false)
 
-	preferredAuthField := tview.NewInputField().
-		SetLabel("PreferredAuthentications:").
-		SetText(defaultValues.PreferredAuthentications).
-		SetFieldWidth(40).
-		SetPlaceholder("e.g., publickey,password")
-	form.AddFormItem(preferredAuthField)
+	sf.addInputFieldWithHelp(form, "PreferredAuthentications:", "PreferredAuthentications", defaultValues.PreferredAuthentications, 40, "e.g., publickey,password")
 
 	// PubkeyAcceptedAlgorithms with autocomplete support (moved from Advanced/Cryptography)
-	pubkeyAlgField := tview.NewInputField().
-		SetLabel("PubkeyAcceptedAlgorithms:").
-		SetText(defaultValues.PubkeyAcceptedAlgorithms).
-		SetFieldWidth(40).
-		SetPlaceholder("algorithms (+/-/^ prefix supported)")
+	pubkeyAlgField := sf.addInputFieldWithHelp(form, "PubkeyAcceptedAlgorithms:", "PubkeyAcceptedAlgorithms", defaultValues.PubkeyAcceptedAlgorithms, 40, "algorithms (+/-/^ prefix supported)")
 	pubkeyAlgField.SetAutocompleteFunc(sf.createAlgorithmAutocomplete(pubkeyAlgorithms))
-	form.AddFormItem(pubkeyAlgField)
 
 	// HostbasedAcceptedAlgorithms with autocomplete support (moved from Advanced/Cryptography)
-	hostbasedAlgField := tview.NewInputField().
-		SetLabel("HostbasedAcceptedAlgorithms:").
-		SetText(defaultValues.HostbasedAcceptedAlgorithms).
-		SetFieldWidth(40).
-		SetPlaceholder("algorithms (+/-/^ prefix supported)")
+	hostbasedAlgField := sf.addInputFieldWithHelp(form, "HostbasedAcceptedAlgorithms:", "HostbasedAcceptedAlgorithms", defaultValues.HostbasedAcceptedAlgorithms, 40, "algorithms (+/-/^ prefix supported)")
 	hostbasedAlgField.SetAutocompleteFunc(sf.createAlgorithmAutocomplete(pubkeyAlgorithms))
-	form.AddFormItem(hostbasedAlgField)
 
 	// Add save and cancel buttons
 	form.AddButton("Save", sf.handleSaveButton)
@@ -1288,110 +1451,79 @@ func (sf *ServerForm) createAdvancedForm() {
 	// StrictHostKeyChecking dropdown
 	strictHostKeyOptions := createOptionsWithDefault("StrictHostKeyChecking", []string{"", "yes", "no", "ask", "accept-new"})
 	strictHostKeyIndex := sf.findOptionIndex(strictHostKeyOptions, defaultValues.StrictHostKeyChecking)
-	form.AddDropDown("StrictHostKeyChecking:", strictHostKeyOptions, strictHostKeyIndex, nil)
+	sf.addDropDownWithHelp(form, "StrictHostKeyChecking:", "StrictHostKeyChecking", strictHostKeyOptions, strictHostKeyIndex)
 
 	// CheckHostIP dropdown
 	checkHostIPOptions := createOptionsWithDefault("CheckHostIP", []string{"", "yes", "no"})
 	checkHostIPIndex := sf.findOptionIndex(checkHostIPOptions, defaultValues.CheckHostIP)
-	form.AddDropDown("CheckHostIP:", checkHostIPOptions, checkHostIPIndex, nil)
+	sf.addDropDownWithHelp(form, "CheckHostIP:", "CheckHostIP", checkHostIPOptions, checkHostIPIndex)
 
 	// FingerprintHash dropdown
 	fingerprintHashOptions := createOptionsWithDefault("FingerprintHash", []string{"", "md5", "sha256"})
 	fingerprintHashIndex := sf.findOptionIndex(fingerprintHashOptions, defaultValues.FingerprintHash)
-	form.AddDropDown("FingerprintHash:", fingerprintHashOptions, fingerprintHashIndex, nil)
+	sf.addDropDownWithHelp(form, "FingerprintHash:", "FingerprintHash", fingerprintHashOptions, fingerprintHashIndex)
 
 	// VerifyHostKeyDNS dropdown
 	verifyHostKeyDNSOptions := createOptionsWithDefault("VerifyHostKeyDNS", []string{"", "yes", "no", "ask"})
 	verifyHostKeyDNSIndex := sf.findOptionIndex(verifyHostKeyDNSOptions, defaultValues.VerifyHostKeyDNS)
-	form.AddDropDown("VerifyHostKeyDNS:", verifyHostKeyDNSOptions, verifyHostKeyDNSIndex, nil)
+	sf.addDropDownWithHelp(form, "VerifyHostKeyDNS:", "VerifyHostKeyDNS", verifyHostKeyDNSOptions, verifyHostKeyDNSIndex)
 
 	// UpdateHostKeys dropdown
 	updateHostKeysOptions := createOptionsWithDefault("UpdateHostKeys", []string{"", "yes", "no", "ask"})
 	updateHostKeysIndex := sf.findOptionIndex(updateHostKeysOptions, defaultValues.UpdateHostKeys)
-	form.AddDropDown("UpdateHostKeys:", updateHostKeysOptions, updateHostKeysIndex, nil)
+	sf.addDropDownWithHelp(form, "UpdateHostKeys:", "UpdateHostKeys", updateHostKeysOptions, updateHostKeysIndex)
 
 	// HashKnownHosts dropdown
 	hashKnownHostsOptions := createOptionsWithDefault("HashKnownHosts", []string{"", "yes", "no"})
 	hashKnownHostsIndex := sf.findOptionIndex(hashKnownHostsOptions, defaultValues.HashKnownHosts)
-	form.AddDropDown("HashKnownHosts:", hashKnownHostsOptions, hashKnownHostsIndex, nil)
+	sf.addDropDownWithHelp(form, "HashKnownHosts:", "HashKnownHosts", hashKnownHostsOptions, hashKnownHostsIndex)
 
 	// VisualHostKey dropdown
 	visualHostKeyOptions := createOptionsWithDefault("VisualHostKey", []string{"", "yes", "no"})
 	visualHostKeyIndex := sf.findOptionIndex(visualHostKeyOptions, defaultValues.VisualHostKey)
-	form.AddDropDown("VisualHostKey:", visualHostKeyOptions, visualHostKeyIndex, nil)
+	sf.addDropDownWithHelp(form, "VisualHostKey:", "VisualHostKey", visualHostKeyOptions, visualHostKeyIndex)
 
-	form.AddInputField("UserKnownHostsFile:", defaultValues.UserKnownHostsFile, 40, nil, nil)
+	sf.addInputFieldWithHelp(form, "UserKnownHostsFile:", "UserKnownHostsFile", defaultValues.UserKnownHostsFile, 40, "")
 
 	form.AddTextView("\n[yellow]▶ Cryptography[-]", "", 0, 1, true, false)
 
 	// Ciphers with autocomplete support
-	ciphersField := tview.NewInputField().
-		SetLabel("Ciphers:").
-		SetText(defaultValues.Ciphers).
-		SetFieldWidth(40).
-		SetPlaceholder("algorithms (+/-/^ prefix supported)")
+	ciphersField := sf.addInputFieldWithHelp(form, "Ciphers:", "Ciphers", defaultValues.Ciphers, 40, "algorithms (+/-/^ prefix supported)")
 	ciphersField.SetAutocompleteFunc(sf.createAlgorithmAutocomplete(cipherAlgorithms))
-	form.AddFormItem(ciphersField)
 
 	// MACs with autocomplete support
-	macsField := tview.NewInputField().
-		SetLabel("MACs:").
-		SetText(defaultValues.MACs).
-		SetFieldWidth(40).
-		SetPlaceholder("algorithms (+/-/^ prefix supported)")
+	macsField := sf.addInputFieldWithHelp(form, "MACs:", "MACs", defaultValues.MACs, 40, "algorithms (+/-/^ prefix supported)")
 	macsField.SetAutocompleteFunc(sf.createAlgorithmAutocomplete(macAlgorithms))
-	form.AddFormItem(macsField)
 
 	// KexAlgorithms with autocomplete support
-	kexField := tview.NewInputField().
-		SetLabel("KexAlgorithms:").
-		SetText(defaultValues.KexAlgorithms).
-		SetFieldWidth(40).
-		SetPlaceholder("algorithms (+/-/^ prefix supported)")
+	kexField := sf.addInputFieldWithHelp(form, "KexAlgorithms:", "KexAlgorithms", defaultValues.KexAlgorithms, 40, "algorithms (+/-/^ prefix supported)")
 	kexField.SetAutocompleteFunc(sf.createAlgorithmAutocomplete(kexAlgorithms))
-	form.AddFormItem(kexField)
 
 	// HostKeyAlgorithms with autocomplete support
-	hostKeyField := tview.NewInputField().
-		SetLabel("HostKeyAlgorithms:").
-		SetText(defaultValues.HostKeyAlgorithms).
-		SetFieldWidth(40).
-		SetPlaceholder("algorithms (+/-/^ prefix supported)")
+	hostKeyField := sf.addInputFieldWithHelp(form, "HostKeyAlgorithms:", "HostKeyAlgorithms", defaultValues.HostKeyAlgorithms, 40, "algorithms (+/-/^ prefix supported)")
 	hostKeyField.SetAutocompleteFunc(sf.createAlgorithmAutocomplete(hostKeyAlgorithms))
-	form.AddFormItem(hostKeyField)
 
 	form.AddTextView("\n[yellow]▶ Command Execution[-]", "", 0, 1, true, false)
-	form.AddInputField("LocalCommand:", defaultValues.LocalCommand, 40, nil, nil)
+	sf.addInputFieldWithHelp(form, "LocalCommand:", "LocalCommand", defaultValues.LocalCommand, 40, "")
 
 	// PermitLocalCommand dropdown
 	permitLocalCommandOptions := createOptionsWithDefault("PermitLocalCommand", []string{"", "yes", "no"})
 	permitLocalCommandIndex := sf.findOptionIndex(permitLocalCommandOptions, defaultValues.PermitLocalCommand)
-	form.AddDropDown("PermitLocalCommand:", permitLocalCommandOptions, permitLocalCommandIndex, nil)
+	sf.addDropDownWithHelp(form, "PermitLocalCommand:", "PermitLocalCommand", permitLocalCommandOptions, permitLocalCommandIndex)
 
 	// EscapeChar input field
 	sf.addValidatedInputField(form, "EscapeChar:", "EscapeChar", defaultValues.EscapeChar, 10, "default: ~")
 
 	form.AddTextView("\n[yellow]▶ Environment[-]", "", 0, 1, true, false)
-	sendEnvField := tview.NewInputField().
-		SetLabel("SendEnv:").
-		SetText(defaultValues.SendEnv).
-		SetFieldWidth(40).
-		SetPlaceholder("e.g., LANG, LC_*, TERM")
-	form.AddFormItem(sendEnvField)
-
-	setEnvField := tview.NewInputField().
-		SetLabel("SetEnv:").
-		SetText(defaultValues.SetEnv).
-		SetFieldWidth(40).
-		SetPlaceholder("e.g., FOO=bar, DEBUG=1")
-	form.AddFormItem(setEnvField)
+	sf.addInputFieldWithHelp(form, "SendEnv:", "SendEnv", defaultValues.SendEnv, 40, "e.g., LANG, LC_*, TERM")
+	sf.addInputFieldWithHelp(form, "SetEnv:", "SetEnv", defaultValues.SetEnv, 40, "e.g., FOO=bar, DEBUG=1")
 
 	form.AddTextView("\n[yellow]▶ Debugging[-]", "", 0, 1, true, false)
 
 	// LogLevel dropdown
 	logLevelOptions := createOptionsWithDefault("LogLevel", []string{"", "QUIET", "FATAL", "ERROR", "INFO", "VERBOSE", "DEBUG", "DEBUG1", "DEBUG2", "DEBUG3"})
 	logLevelIndex := sf.findOptionIndex(logLevelOptions, defaultValues.LogLevel)
-	form.AddDropDown("LogLevel:", logLevelOptions, logLevelIndex, nil)
+	sf.addDropDownWithHelp(form, "LogLevel:", "LogLevel", logLevelOptions, logLevelIndex)
 
 	// Add save and cancel buttons
 	form.AddButton("Save", sf.handleSaveButton)
