@@ -327,8 +327,8 @@ func (t *tui) showDeleteConfirmModal(server domain.Server) {
 func (t *tui) showEditTagsForm(server domain.Server) {
 	form := tview.NewForm()
 	form.SetBorder(true).
-		SetTitle(fmt.Sprintf("Edit Tags: %s", server.Alias)).
-		SetTitleAlign(tview.AlignLeft)
+		SetTitle(fmt.Sprintf(" Edit Tags: %s ", server.Alias)).
+		SetTitleAlign(tview.AlignCenter)
 
 	defaultTags := strings.Join(server.Tags, ", ")
 	form.AddInputField("Tags (comma):", defaultTags, 40, nil, nil)

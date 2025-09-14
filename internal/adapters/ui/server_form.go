@@ -77,7 +77,7 @@ func NewServerForm(mode ServerFormMode, original *domain.Server) *ServerForm {
 	helpPanel.SetBorder(true).
 		SetBorderPadding(0, 0, 1, 1).
 		SetTitle(" Help ").
-		SetTitleAlign(tview.AlignLeft)
+		SetTitleAlign(tview.AlignCenter)
 
 	// Create main container for form and help
 	mainContainer := tview.NewFlex().SetDirection(tview.FlexColumn)
@@ -115,8 +115,6 @@ func NewServerForm(mode ServerFormMode, original *domain.Server) *ServerForm {
 }
 
 func (sf *ServerForm) build() {
-	title := sf.titleForMode()
-
 	// Create header
 	sf.header = NewAppHeader(sf.version, sf.commit, RepoURL)
 
@@ -132,8 +130,8 @@ func (sf *ServerForm) build() {
 
 	// Setup form panel
 	sf.formPanel.SetBorder(true).
-		SetTitle(title).
-		SetTitleAlign(tview.AlignLeft).
+		SetTitle(" " + sf.titleForMode() + " ").
+		SetTitleAlign(tview.AlignCenter).
 		SetBorderColor(tcell.Color238).
 		SetTitleColor(tcell.Color250)
 
@@ -1869,7 +1867,7 @@ func (sf *ServerForm) handleSave() bool {
 	data := sf.getFormData()
 
 	// Reset title and border (validation already done above)
-	sf.formPanel.SetTitle(sf.titleForMode())
+	sf.formPanel.SetTitle(" " + sf.titleForMode() + " ")
 	sf.formPanel.SetBorderColor(tcell.Color238)
 
 	server := sf.dataToServer(data)

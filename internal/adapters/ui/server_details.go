@@ -39,7 +39,8 @@ func (sd *ServerDetails) build() {
 	sd.TextView.SetDynamicColors(true).
 		SetWrap(true).
 		SetBorder(true).
-		SetTitle("Details").
+		SetTitle(" Details ").
+		SetTitleAlign(tview.AlignCenter).
 		SetBorderColor(tcell.Color238).
 		SetTitleColor(tcell.Color250)
 }
