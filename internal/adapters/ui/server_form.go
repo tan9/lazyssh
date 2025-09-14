@@ -26,61 +26,9 @@ import (
 	"github.com/rivo/tview"
 )
 
-// sshDefaults contains the default values for SSH configuration options
-// Based on OpenSSH defaults (version 8.x+)
-var sshDefaults = map[string]string{
-	// Connection settings
-	"Port":                      "22",
-	"ConnectTimeout":            "none",
-	"ConnectionAttempts":        "1",
-	"TCPKeepAlive":              "yes",
-	"ServerAliveInterval":       "0",
-	"ServerAliveCountMax":       "3",
-	"Compression":               "no",
-	"AddressFamily":             "any",
-	"ExitOnForwardFailure":      "no",
-	"IPQoS":                     "af21 cs1",
-	"CanonicalizeHostname":      "no",
-	"CanonicalizeFallbackLocal": "yes",
-	"CanonicalizeMaxDots":       "1",
-
-	// Authentication
-	"PubkeyAuthentication":         "yes",
-	"PasswordAuthentication":       "yes",
-	"IdentitiesOnly":               "no",
-	"AddKeysToAgent":               "no",
-	"KbdInteractiveAuthentication": "yes",
-	"NumberOfPasswordPrompts":      "3",
-
-	// Forwarding
-	"ForwardAgent":        "no",
-	"ForwardX11":          "no",
-	"ForwardX11Trusted":   "no",
-	"ClearAllForwardings": "no",
-	"GatewayPorts":        "no",
-
-	// Multiplexing
-	"ControlMaster":  "no",
-	"ControlPath":    "none",
-	"ControlPersist": "no",
-
-	// Security
-	"StrictHostKeyChecking": "ask",
-	"CheckHostIP":           "no",
-	"FingerprintHash":       "SHA256",
-	"VerifyHostKeyDNS":      "no",
-	"UpdateHostKeys":        "no",
-	"HashKnownHosts":        "no",
-	"VisualHostKey":         "no",
-	"PermitLocalCommand":    "no",
-	"EscapeChar":            "~",
-	"BatchMode":             "no",
-
-	// Other
-	"RequestTTY":  "auto",
-	"SessionType": "default",
-	"LogLevel":    "INFO",
-}
+// sshDefaults is now replaced by SSHFieldDefaults in defaults.go
+// This variable references the centralized defaults for consistency
+var sshDefaults = SSHFieldDefaults
 
 type ServerFormMode int
 
@@ -1134,12 +1082,99 @@ func (sf *ServerForm) getDefaultValues() ServerFormData {
 		}
 	}
 
+	// Use centralized defaults from SSHFieldDefaults
 	return ServerFormData{
-		Alias: "", // Explicitly empty for new servers
-		Host:  "", // Explicitly empty for new servers
-		User:  "root",
-		Port:  "22",
+		Alias: "",                         // Explicitly empty for new servers
+		Host:  "",                         // Explicitly empty for new servers
+		User:  GetSSHFieldDefault("User"), // Empty means current username (OpenSSH default)
+		Port:  GetSSHFieldDefaultWithFallback("Port", "22"),
 		Key:   defaultKey,
+		Tags:  "",
+
+		// Connection and proxy settings
+		ProxyJump:            GetSSHFieldDefault("ProxyJump"),
+		ProxyCommand:         GetSSHFieldDefault("ProxyCommand"),
+		RemoteCommand:        GetSSHFieldDefault("RemoteCommand"),
+		RequestTTY:           GetSSHFieldDefault("RequestTTY"),
+		SessionType:          GetSSHFieldDefault("SessionType"),
+		ConnectTimeout:       GetSSHFieldDefault("ConnectTimeout"),
+		ConnectionAttempts:   GetSSHFieldDefault("ConnectionAttempts"),
+		BindAddress:          GetSSHFieldDefault("BindAddress"),
+		BindInterface:        GetSSHFieldDefault("BindInterface"),
+		AddressFamily:        GetSSHFieldDefault("AddressFamily"),
+		ExitOnForwardFailure: GetSSHFieldDefault("ExitOnForwardFailure"),
+		IPQoS:                GetSSHFieldDefault("IPQoS"),
+
+		// Hostname canonicalization
+		CanonicalizeHostname:        GetSSHFieldDefault("CanonicalizeHostname"),
+		CanonicalDomains:            GetSSHFieldDefault("CanonicalDomains"),
+		CanonicalizeFallbackLocal:   GetSSHFieldDefault("CanonicalizeFallbackLocal"),
+		CanonicalizeMaxDots:         GetSSHFieldDefault("CanonicalizeMaxDots"),
+		CanonicalizePermittedCNAMEs: GetSSHFieldDefault("CanonicalizePermittedCNAMEs"),
+
+		// Port forwarding
+		LocalForward:        GetSSHFieldDefault("LocalForward"),
+		RemoteForward:       GetSSHFieldDefault("RemoteForward"),
+		DynamicForward:      GetSSHFieldDefault("DynamicForward"),
+		ClearAllForwardings: GetSSHFieldDefault("ClearAllForwardings"),
+		GatewayPorts:        GetSSHFieldDefault("GatewayPorts"),
+
+		// Authentication
+		PubkeyAuthentication:         GetSSHFieldDefault("PubkeyAuthentication"),
+		IdentitiesOnly:               GetSSHFieldDefault("IdentitiesOnly"),
+		AddKeysToAgent:               GetSSHFieldDefault("AddKeysToAgent"),
+		IdentityAgent:                GetSSHFieldDefault("IdentityAgent"),
+		PasswordAuthentication:       GetSSHFieldDefault("PasswordAuthentication"),
+		KbdInteractiveAuthentication: GetSSHFieldDefault("KbdInteractiveAuthentication"),
+		NumberOfPasswordPrompts:      GetSSHFieldDefault("NumberOfPasswordPrompts"),
+		PreferredAuthentications:     GetSSHFieldDefault("PreferredAuthentications"),
+		PubkeyAcceptedAlgorithms:     GetSSHFieldDefault("PubkeyAcceptedAlgorithms"),
+		HostbasedAcceptedAlgorithms:  GetSSHFieldDefault("HostbasedAcceptedAlgorithms"),
+
+		// Forwarding
+		ForwardAgent:      GetSSHFieldDefault("ForwardAgent"),
+		ForwardX11:        GetSSHFieldDefault("ForwardX11"),
+		ForwardX11Trusted: GetSSHFieldDefault("ForwardX11Trusted"),
+
+		// Multiplexing
+		ControlMaster:  GetSSHFieldDefault("ControlMaster"),
+		ControlPath:    GetSSHFieldDefault("ControlPath"),
+		ControlPersist: GetSSHFieldDefault("ControlPersist"),
+
+		// Keep-alive
+		ServerAliveInterval: GetSSHFieldDefault("ServerAliveInterval"),
+		ServerAliveCountMax: GetSSHFieldDefault("ServerAliveCountMax"),
+		TCPKeepAlive:        GetSSHFieldDefault("TCPKeepAlive"),
+
+		// Connection
+		Compression: GetSSHFieldDefault("Compression"),
+		BatchMode:   GetSSHFieldDefault("BatchMode"),
+
+		// Security
+		StrictHostKeyChecking: GetSSHFieldDefault("StrictHostKeyChecking"),
+		CheckHostIP:           GetSSHFieldDefault("CheckHostIP"),
+		FingerprintHash:       GetSSHFieldDefault("FingerprintHash"),
+		UserKnownHostsFile:    GetSSHFieldDefault("UserKnownHostsFile"),
+		HostKeyAlgorithms:     GetSSHFieldDefault("HostKeyAlgorithms"),
+		MACs:                  GetSSHFieldDefault("MACs"),
+		Ciphers:               GetSSHFieldDefault("Ciphers"),
+		KexAlgorithms:         GetSSHFieldDefault("KexAlgorithms"),
+		VerifyHostKeyDNS:      GetSSHFieldDefault("VerifyHostKeyDNS"),
+		UpdateHostKeys:        GetSSHFieldDefault("UpdateHostKeys"),
+		HashKnownHosts:        GetSSHFieldDefault("HashKnownHosts"),
+		VisualHostKey:         GetSSHFieldDefault("VisualHostKey"),
+
+		// Command execution
+		LocalCommand:       GetSSHFieldDefault("LocalCommand"),
+		PermitLocalCommand: GetSSHFieldDefault("PermitLocalCommand"),
+		EscapeChar:         GetSSHFieldDefault("EscapeChar"),
+
+		// Environment
+		SendEnv: GetSSHFieldDefault("SendEnv"),
+		SetEnv:  GetSSHFieldDefault("SetEnv"),
+
+		// Debugging
+		LogLevel: GetSSHFieldDefault("LogLevel"),
 	}
 }
 
@@ -1149,17 +1184,17 @@ func (sf *ServerForm) createBasicForm() {
 	defaultValues := sf.getDefaultValues()
 
 	// Add validated input fields
-	sf.addValidatedInputField(form, "Alias:", "Alias", defaultValues.Alias, 20, "")
-	sf.addValidatedInputField(form, "Host/IP:", "Host", defaultValues.Host, 20, "")
-	sf.addValidatedInputField(form, "User:", "User", defaultValues.User, 20, "default: root")
-	sf.addValidatedInputField(form, "Port:", "Port", defaultValues.Port, 20, "default: 22")
+	sf.addValidatedInputField(form, "Alias:", "Alias", defaultValues.Alias, 20, GetFieldPlaceholder("Alias"))
+	sf.addValidatedInputField(form, "Host/IP:", "Host", defaultValues.Host, 20, GetFieldPlaceholder("Host"))
+	sf.addValidatedInputField(form, "User:", "User", defaultValues.User, 20, GetFieldPlaceholder("User"))
+	sf.addValidatedInputField(form, "Port:", "Port", defaultValues.Port, 20, GetFieldPlaceholder("Port"))
 
 	// Keys field with autocomplete
-	keysField := sf.addValidatedInputField(form, "Keys:", "Keys", defaultValues.Key, 40, "e.g., ~/.ssh/id_rsa, ~/.ssh/id_ed25519")
+	keysField := sf.addValidatedInputField(form, "Keys:", "Keys", defaultValues.Key, 40, GetFieldPlaceholder("Keys"))
 	keysField.SetAutocompleteFunc(sf.createSSHKeyAutocomplete())
 
 	// Tags field
-	sf.addValidatedInputField(form, "Tags:", "Tags", defaultValues.Tags, 30, "comma-separated tags")
+	sf.addValidatedInputField(form, "Tags:", "Tags", defaultValues.Tags, 30, GetFieldPlaceholder("Tags"))
 
 	// Add save and cancel buttons
 	form.AddButton("Save", sf.handleSaveButton)
@@ -1178,9 +1213,9 @@ func (sf *ServerForm) createConnectionForm() {
 	defaultValues := sf.getDefaultValues()
 
 	form.AddTextView("\n[yellow]▶ Proxy & Command[-]", "", 0, 1, true, false)
-	sf.addInputFieldWithHelp(form, "ProxyJump:", "ProxyJump", defaultValues.ProxyJump, 40, "")
-	sf.addInputFieldWithHelp(form, "ProxyCommand:", "ProxyCommand", defaultValues.ProxyCommand, 40, "")
-	sf.addInputFieldWithHelp(form, "RemoteCommand:", "RemoteCommand", defaultValues.RemoteCommand, 40, "")
+	sf.addInputFieldWithHelp(form, "ProxyJump:", "ProxyJump", defaultValues.ProxyJump, 40, GetFieldPlaceholder("ProxyJump"))
+	sf.addInputFieldWithHelp(form, "ProxyCommand:", "ProxyCommand", defaultValues.ProxyCommand, 40, GetFieldPlaceholder("ProxyCommand"))
+	sf.addInputFieldWithHelp(form, "RemoteCommand:", "RemoteCommand", defaultValues.RemoteCommand, 40, GetFieldPlaceholder("RemoteCommand"))
 
 	// RequestTTY dropdown
 	requestTTYOptions := createOptionsWithDefault("RequestTTY", []string{"", "yes", "no", "force", "auto"})
@@ -1193,9 +1228,9 @@ func (sf *ServerForm) createConnectionForm() {
 	sf.addDropDownWithHelp(form, "SessionType:", "SessionType", sessionTypeOptions, sessionTypeIndex)
 
 	form.AddTextView("\n[yellow]▶ Connection Settings[-]", "", 0, 1, true, false)
-	sf.addValidatedInputField(form, "ConnectTimeout:", "ConnectTimeout", defaultValues.ConnectTimeout, 10, "seconds (default: none)")
-	sf.addValidatedInputField(form, "ConnectionAttempts:", "ConnectionAttempts", defaultValues.ConnectionAttempts, 10, "default: 1")
-	sf.addValidatedInputField(form, "IPQoS:", "IPQoS", defaultValues.IPQoS, 20, "default: af21 cs1")
+	sf.addValidatedInputField(form, "ConnectTimeout:", "ConnectTimeout", defaultValues.ConnectTimeout, 10, GetFieldPlaceholder("ConnectTimeout"))
+	sf.addValidatedInputField(form, "ConnectionAttempts:", "ConnectionAttempts", defaultValues.ConnectionAttempts, 10, GetFieldPlaceholder("ConnectionAttempts"))
+	sf.addValidatedInputField(form, "IPQoS:", "IPQoS", defaultValues.IPQoS, 20, GetFieldPlaceholder("IPQoS"))
 
 	// BatchMode dropdown (moved from Keep-Alive)
 	batchModeOptions := createOptionsWithDefault("BatchMode", []string{"", "yes", "no"})
@@ -1203,7 +1238,7 @@ func (sf *ServerForm) createConnectionForm() {
 	sf.addDropDownWithHelp(form, "BatchMode:", "BatchMode", batchModeOptions, batchModeIndex)
 
 	form.AddTextView("\n[yellow]▶ Bind Options[-]", "", 0, 1, true, false)
-	sf.addValidatedInputField(form, "BindAddress:", "BindAddress", defaultValues.BindAddress, 40, "IP, hostname, * (all), or localhost")
+	sf.addValidatedInputField(form, "BindAddress:", "BindAddress", defaultValues.BindAddress, 40, GetFieldPlaceholder("BindAddress"))
 
 	// BindInterface dropdown with available network interfaces
 	interfaceOptions := append([]string{""}, GetNetworkInterfaces()...)
@@ -1222,20 +1257,20 @@ func (sf *ServerForm) createConnectionForm() {
 	canonicalizeIndex := sf.findOptionIndex(canonicalizeOptions, defaultValues.CanonicalizeHostname)
 	sf.addDropDownWithHelp(form, "CanonicalizeHostname:", "CanonicalizeHostname", canonicalizeOptions, canonicalizeIndex)
 
-	sf.addInputFieldWithHelp(form, "CanonicalDomains:", "CanonicalDomains", defaultValues.CanonicalDomains, 40, "e.g., example.com, internal.net")
+	sf.addInputFieldWithHelp(form, "CanonicalDomains:", "CanonicalDomains", defaultValues.CanonicalDomains, 40, GetFieldPlaceholder("CanonicalDomains"))
 
 	// CanonicalizeFallbackLocal dropdown
 	fallbackOptions := createOptionsWithDefault("CanonicalizeFallbackLocal", []string{"", "yes", "no"})
 	fallbackIndex := sf.findOptionIndex(fallbackOptions, defaultValues.CanonicalizeFallbackLocal)
 	sf.addDropDownWithHelp(form, "CanonicalizeFallbackLocal:", "CanonicalizeFallbackLocal", fallbackOptions, fallbackIndex)
 
-	sf.addValidatedInputField(form, "CanonicalizeMaxDots:", "CanonicalizeMaxDots", defaultValues.CanonicalizeMaxDots, 10, "default: 1")
+	sf.addValidatedInputField(form, "CanonicalizeMaxDots:", "CanonicalizeMaxDots", defaultValues.CanonicalizeMaxDots, 10, GetFieldPlaceholder("CanonicalizeMaxDots"))
 
-	sf.addInputFieldWithHelp(form, "CanonicalizePermittedCNAMEs:", "CanonicalizePermittedCNAMEs", defaultValues.CanonicalizePermittedCNAMEs, 40, "e.g., *.example.com:example.net")
+	sf.addInputFieldWithHelp(form, "CanonicalizePermittedCNAMEs:", "CanonicalizePermittedCNAMEs", defaultValues.CanonicalizePermittedCNAMEs, 40, GetFieldPlaceholder("CanonicalizePermittedCNAMEs"))
 
 	form.AddTextView("\n[yellow]▶ Keep-Alive[-]", "", 0, 1, true, false)
-	sf.addValidatedInputField(form, "ServerAliveInterval:", "ServerAliveInterval", defaultValues.ServerAliveInterval, 10, "seconds (default: 0)")
-	sf.addValidatedInputField(form, "ServerAliveCountMax:", "ServerAliveCountMax", defaultValues.ServerAliveCountMax, 10, "default: 3")
+	sf.addValidatedInputField(form, "ServerAliveInterval:", "ServerAliveInterval", defaultValues.ServerAliveInterval, 10, GetFieldPlaceholder("ServerAliveInterval"))
+	sf.addValidatedInputField(form, "ServerAliveCountMax:", "ServerAliveCountMax", defaultValues.ServerAliveCountMax, 10, GetFieldPlaceholder("ServerAliveCountMax"))
 
 	// Compression dropdown
 	compressionOptions := createOptionsWithDefault("Compression", []string{"", "yes", "no"})
@@ -1252,8 +1287,8 @@ func (sf *ServerForm) createConnectionForm() {
 	controlMasterOptions := createOptionsWithDefault("ControlMaster", []string{"", "yes", "no", "auto", "ask", "autoask"})
 	controlMasterIndex := sf.findOptionIndex(controlMasterOptions, defaultValues.ControlMaster)
 	sf.addDropDownWithHelp(form, "ControlMaster:", "ControlMaster", controlMasterOptions, controlMasterIndex)
-	sf.addInputFieldWithHelp(form, "ControlPath:", "ControlPath", defaultValues.ControlPath, 40, "")
-	sf.addInputFieldWithHelp(form, "ControlPersist:", "ControlPersist", defaultValues.ControlPersist, 20, "")
+	sf.addInputFieldWithHelp(form, "ControlPath:", "ControlPath", defaultValues.ControlPath, 40, GetFieldPlaceholder("ControlPath"))
+	sf.addInputFieldWithHelp(form, "ControlPersist:", "ControlPersist", defaultValues.ControlPersist, 20, GetFieldPlaceholder("ControlPersist"))
 
 	// Add save and cancel buttons
 	form.AddButton("Save", sf.handleSaveButton)
@@ -1272,9 +1307,9 @@ func (sf *ServerForm) createForwardingForm() {
 	defaultValues := sf.getDefaultValues()
 
 	form.AddTextView("\n[yellow]▶ Port Forwarding[-]", "", 0, 1, true, false)
-	sf.addValidatedInputField(form, "LocalForward:", "LocalForward", defaultValues.LocalForward, 40, "e.g., 8080:localhost:80, 3000:localhost:3000")
-	sf.addValidatedInputField(form, "RemoteForward:", "RemoteForward", defaultValues.RemoteForward, 40, "e.g., 80:localhost:8080")
-	sf.addValidatedInputField(form, "DynamicForward:", "DynamicForward", defaultValues.DynamicForward, 40, "e.g., 1080, 1081")
+	sf.addValidatedInputField(form, "LocalForward:", "LocalForward", defaultValues.LocalForward, 40, GetFieldPlaceholder("LocalForward"))
+	sf.addValidatedInputField(form, "RemoteForward:", "RemoteForward", defaultValues.RemoteForward, 40, GetFieldPlaceholder("RemoteForward"))
+	sf.addValidatedInputField(form, "DynamicForward:", "DynamicForward", defaultValues.DynamicForward, 40, GetFieldPlaceholder("DynamicForward"))
 
 	// ClearAllForwardings dropdown
 	clearAllForwardingsOptions := createOptionsWithDefault("ClearAllForwardings", []string{"", "yes", "no"})
@@ -1406,7 +1441,7 @@ func (sf *ServerForm) createAuthenticationForm() {
 	addKeysIndex := sf.findOptionIndex(addKeysOptions, defaultValues.AddKeysToAgent)
 	sf.addDropDownWithHelp(form, "AddKeysToAgent:", "AddKeysToAgent", addKeysOptions, addKeysIndex)
 
-	sf.addInputFieldWithHelp(form, "IdentityAgent:", "IdentityAgent", defaultValues.IdentityAgent, 40, "")
+	sf.addInputFieldWithHelp(form, "IdentityAgent:", "IdentityAgent", defaultValues.IdentityAgent, 40, GetFieldPlaceholder("IdentityAgent"))
 
 	// Password/Interactive authentication
 	form.AddTextView("\n[yellow]▶ Password & Interactive[-]", "", 0, 1, true, false)
@@ -1422,19 +1457,19 @@ func (sf *ServerForm) createAuthenticationForm() {
 	sf.addDropDownWithHelp(form, "KbdInteractiveAuthentication:", "KbdInteractiveAuthentication", kbdInteractiveOptions, kbdInteractiveIndex)
 
 	// NumberOfPasswordPrompts field
-	sf.addValidatedInputField(form, "NumberOfPasswordPrompts:", "NumberOfPasswordPrompts", defaultValues.NumberOfPasswordPrompts, 10, "default: 3")
+	sf.addValidatedInputField(form, "NumberOfPasswordPrompts:", "NumberOfPasswordPrompts", defaultValues.NumberOfPasswordPrompts, 10, GetFieldPlaceholder("NumberOfPasswordPrompts"))
 
 	// Advanced: Authentication order preference
 	form.AddTextView("\n[yellow]▶ Advanced[-]", "", 0, 1, true, false)
 
-	sf.addInputFieldWithHelp(form, "PreferredAuthentications:", "PreferredAuthentications", defaultValues.PreferredAuthentications, 40, "e.g., publickey,password")
+	sf.addInputFieldWithHelp(form, "PreferredAuthentications:", "PreferredAuthentications", defaultValues.PreferredAuthentications, 40, GetFieldPlaceholder("PreferredAuthentications"))
 
 	// PubkeyAcceptedAlgorithms with autocomplete support (moved from Advanced/Cryptography)
-	pubkeyAlgField := sf.addInputFieldWithHelp(form, "PubkeyAcceptedAlgorithms:", "PubkeyAcceptedAlgorithms", defaultValues.PubkeyAcceptedAlgorithms, 40, "algorithms (+/-/^ prefix supported)")
+	pubkeyAlgField := sf.addInputFieldWithHelp(form, "PubkeyAcceptedAlgorithms:", "PubkeyAcceptedAlgorithms", defaultValues.PubkeyAcceptedAlgorithms, 40, GetFieldPlaceholder("PubkeyAcceptedAlgorithms"))
 	pubkeyAlgField.SetAutocompleteFunc(sf.createAlgorithmAutocomplete(pubkeyAlgorithms))
 
 	// HostbasedAcceptedAlgorithms with autocomplete support (moved from Advanced/Cryptography)
-	hostbasedAlgField := sf.addInputFieldWithHelp(form, "HostbasedAcceptedAlgorithms:", "HostbasedAcceptedAlgorithms", defaultValues.HostbasedAcceptedAlgorithms, 40, "algorithms (+/-/^ prefix supported)")
+	hostbasedAlgField := sf.addInputFieldWithHelp(form, "HostbasedAcceptedAlgorithms:", "HostbasedAcceptedAlgorithms", defaultValues.HostbasedAcceptedAlgorithms, 40, GetFieldPlaceholder("HostbasedAcceptedAlgorithms"))
 	hostbasedAlgField.SetAutocompleteFunc(sf.createAlgorithmAutocomplete(pubkeyAlgorithms))
 
 	// Add save and cancel buttons
@@ -1490,28 +1525,28 @@ func (sf *ServerForm) createAdvancedForm() {
 	visualHostKeyIndex := sf.findOptionIndex(visualHostKeyOptions, defaultValues.VisualHostKey)
 	sf.addDropDownWithHelp(form, "VisualHostKey:", "VisualHostKey", visualHostKeyOptions, visualHostKeyIndex)
 
-	sf.addInputFieldWithHelp(form, "UserKnownHostsFile:", "UserKnownHostsFile", defaultValues.UserKnownHostsFile, 40, "")
+	sf.addInputFieldWithHelp(form, "UserKnownHostsFile:", "UserKnownHostsFile", defaultValues.UserKnownHostsFile, 40, GetFieldPlaceholder("UserKnownHostsFile"))
 
 	form.AddTextView("\n[yellow]▶ Cryptography[-]", "", 0, 1, true, false)
 
 	// Ciphers with autocomplete support
-	ciphersField := sf.addInputFieldWithHelp(form, "Ciphers:", "Ciphers", defaultValues.Ciphers, 40, "algorithms (+/-/^ prefix supported)")
+	ciphersField := sf.addInputFieldWithHelp(form, "Ciphers:", "Ciphers", defaultValues.Ciphers, 40, GetFieldPlaceholder("Ciphers"))
 	ciphersField.SetAutocompleteFunc(sf.createAlgorithmAutocomplete(cipherAlgorithms))
 
 	// MACs with autocomplete support
-	macsField := sf.addInputFieldWithHelp(form, "MACs:", "MACs", defaultValues.MACs, 40, "algorithms (+/-/^ prefix supported)")
+	macsField := sf.addInputFieldWithHelp(form, "MACs:", "MACs", defaultValues.MACs, 40, GetFieldPlaceholder("MACs"))
 	macsField.SetAutocompleteFunc(sf.createAlgorithmAutocomplete(macAlgorithms))
 
 	// KexAlgorithms with autocomplete support
-	kexField := sf.addInputFieldWithHelp(form, "KexAlgorithms:", "KexAlgorithms", defaultValues.KexAlgorithms, 40, "algorithms (+/-/^ prefix supported)")
+	kexField := sf.addInputFieldWithHelp(form, "KexAlgorithms:", "KexAlgorithms", defaultValues.KexAlgorithms, 40, GetFieldPlaceholder("KexAlgorithms"))
 	kexField.SetAutocompleteFunc(sf.createAlgorithmAutocomplete(kexAlgorithms))
 
 	// HostKeyAlgorithms with autocomplete support
-	hostKeyField := sf.addInputFieldWithHelp(form, "HostKeyAlgorithms:", "HostKeyAlgorithms", defaultValues.HostKeyAlgorithms, 40, "algorithms (+/-/^ prefix supported)")
+	hostKeyField := sf.addInputFieldWithHelp(form, "HostKeyAlgorithms:", "HostKeyAlgorithms", defaultValues.HostKeyAlgorithms, 40, GetFieldPlaceholder("HostKeyAlgorithms"))
 	hostKeyField.SetAutocompleteFunc(sf.createAlgorithmAutocomplete(hostKeyAlgorithms))
 
 	form.AddTextView("\n[yellow]▶ Command Execution[-]", "", 0, 1, true, false)
-	sf.addInputFieldWithHelp(form, "LocalCommand:", "LocalCommand", defaultValues.LocalCommand, 40, "")
+	sf.addInputFieldWithHelp(form, "LocalCommand:", "LocalCommand", defaultValues.LocalCommand, 40, GetFieldPlaceholder("LocalCommand"))
 
 	// PermitLocalCommand dropdown
 	permitLocalCommandOptions := createOptionsWithDefault("PermitLocalCommand", []string{"", "yes", "no"})
@@ -1519,11 +1554,11 @@ func (sf *ServerForm) createAdvancedForm() {
 	sf.addDropDownWithHelp(form, "PermitLocalCommand:", "PermitLocalCommand", permitLocalCommandOptions, permitLocalCommandIndex)
 
 	// EscapeChar input field
-	sf.addValidatedInputField(form, "EscapeChar:", "EscapeChar", defaultValues.EscapeChar, 10, "default: ~")
+	sf.addValidatedInputField(form, "EscapeChar:", "EscapeChar", defaultValues.EscapeChar, 10, GetFieldPlaceholder("EscapeChar"))
 
 	form.AddTextView("\n[yellow]▶ Environment[-]", "", 0, 1, true, false)
-	sf.addInputFieldWithHelp(form, "SendEnv:", "SendEnv", defaultValues.SendEnv, 40, "e.g., LANG, LC_*, TERM")
-	sf.addInputFieldWithHelp(form, "SetEnv:", "SetEnv", defaultValues.SetEnv, 40, "e.g., FOO=bar, DEBUG=1")
+	sf.addInputFieldWithHelp(form, "SendEnv:", "SendEnv", defaultValues.SendEnv, 40, GetFieldPlaceholder("SendEnv"))
+	sf.addInputFieldWithHelp(form, "SetEnv:", "SetEnv", defaultValues.SetEnv, 40, GetFieldPlaceholder("SetEnv"))
 
 	form.AddTextView("\n[yellow]▶ Debugging[-]", "", 0, 1, true, false)
 

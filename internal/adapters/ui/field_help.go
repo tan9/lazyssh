@@ -38,9 +38,58 @@ const (
 // GetFieldHelp returns help information for a specific field
 func GetFieldHelp(fieldName string) *FieldHelp {
 	if help, exists := fieldHelpData[fieldName]; exists {
+		// Update default value from centralized source
+		defaultValue := GetSSHFieldDefault(fieldName)
+		if defaultValue != "" {
+			help.Default = formatDefaultValue(fieldName, defaultValue)
+		}
 		return &help
 	}
 	return nil
+}
+
+// formatDefaultValue formats the default value for display in help
+func formatDefaultValue(fieldName, value string) string {
+	// Special formatting for certain fields
+	switch fieldName {
+	case "ConnectTimeout":
+		if value == "" {
+			return "none (system default)"
+		}
+		return value + " seconds"
+	case "ServerAliveInterval":
+		if value == "0" {
+			return "0 (disabled)"
+		}
+		return value + " seconds"
+	case "ControlPath", "ProxyJump", "ProxyCommand", "RemoteCommand",
+		"LocalForward", "RemoteForward", "DynamicForward",
+		"LocalCommand", "SendEnv", "SetEnv", "BindAddress", "BindInterface",
+		"CanonicalDomains", "CanonicalizePermittedCNAMEs",
+		"PubkeyAcceptedAlgorithms", "HostbasedAcceptedAlgorithms",
+		"HostKeyAlgorithms", "Ciphers", "MACs", "KexAlgorithms":
+		if value == "" {
+			return "none" //nolint:goconst // "none" here means empty/not configured, different from sessionTypeNone
+		}
+		return value
+	case "PreferredAuthentications":
+		if value == "gssapi-with-mic,hostbased,publickey,keyboard-interactive,password" {
+			return "gssapi-with-mic,hostbased,publickey,keyboard-interactive,password"
+		}
+		return value
+	case "IdentityAgent":
+		if value == "SSH_AUTH_SOCK" {
+			return "SSH_AUTH_SOCK"
+		}
+		return value
+	case "User":
+		if value == "" {
+			return "current username"
+		}
+		return value
+	default:
+		return value
+	}
 }
 
 // fieldHelpData contains help information for all SSH config fields
