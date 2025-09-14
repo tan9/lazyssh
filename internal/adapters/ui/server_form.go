@@ -16,7 +16,6 @@ package ui
 
 import (
 	"fmt"
-	"os"
 	"reflect"
 	"strconv"
 	"strings"
@@ -1139,118 +1138,101 @@ func (sf *ServerForm) getDefaultValues() ServerFormData {
 			LogLevel:                    sf.original.LogLevel,
 		}
 	}
-	// Determine default key based on availability
-	defaultKey := "~/.ssh/id_ed25519"
-	availableKeys := GetAvailableSSHKeys()
-	if len(availableKeys) > 0 {
-		// Use the first available key as default
-		defaultKey = availableKeys[0]
-	} else {
-		// Check if id_ed25519 exists, otherwise try id_rsa
-		for _, key := range []string{"~/.ssh/id_ed25519", "~/.ssh/id_rsa"} {
-			if homeDir, err := os.UserHomeDir(); err == nil {
-				keyPath := strings.Replace(key, "~", homeDir, 1)
-				if _, err := os.Stat(keyPath); err == nil {
-					defaultKey = key
-					break
-				}
-			}
-		}
-	}
-
-	// Use centralized defaults from SSHFieldDefaults
+	// For new servers, use empty values instead of SSH defaults
+	// SSH defaults will be applied by the SSH client if values are not specified
 	return ServerFormData{
-		Alias: "",                         // Explicitly empty for new servers
-		Host:  "",                         // Explicitly empty for new servers
-		User:  GetSSHFieldDefault("User"), // Empty means current username (OpenSSH default)
-		Port:  GetSSHFieldDefaultWithFallback("Port", "22"),
-		Key:   defaultKey,
+		Alias: "",   // Explicitly empty for new servers
+		Host:  "",   // Explicitly empty for new servers
+		User:  "",   // Empty for new servers (SSH will use current username)
+		Port:  "22", // Keep port 22 as it's the standard SSH port
+		Key:   "",   // Empty for new servers (SSH will try default keys)
 		Tags:  "",
 
-		// Connection and proxy settings
-		ProxyJump:            GetSSHFieldDefault("ProxyJump"),
-		ProxyCommand:         GetSSHFieldDefault("ProxyCommand"),
-		RemoteCommand:        GetSSHFieldDefault("RemoteCommand"),
-		RequestTTY:           GetSSHFieldDefault("RequestTTY"),
-		SessionType:          GetSSHFieldDefault("SessionType"),
-		ConnectTimeout:       GetSSHFieldDefault("ConnectTimeout"),
-		ConnectionAttempts:   GetSSHFieldDefault("ConnectionAttempts"),
-		BindAddress:          GetSSHFieldDefault("BindAddress"),
-		BindInterface:        GetSSHFieldDefault("BindInterface"),
-		AddressFamily:        GetSSHFieldDefault("AddressFamily"),
-		ExitOnForwardFailure: GetSSHFieldDefault("ExitOnForwardFailure"),
-		IPQoS:                GetSSHFieldDefault("IPQoS"),
+		// All other fields should be empty for new servers
+		// The SSH client will use its defaults when these are not specified
+		ProxyJump:            "",
+		ProxyCommand:         "",
+		RemoteCommand:        "",
+		RequestTTY:           "",
+		SessionType:          "",
+		ConnectTimeout:       "",
+		ConnectionAttempts:   "",
+		BindAddress:          "",
+		BindInterface:        "",
+		AddressFamily:        "",
+		ExitOnForwardFailure: "",
+		IPQoS:                "",
 
 		// Hostname canonicalization
-		CanonicalizeHostname:        GetSSHFieldDefault("CanonicalizeHostname"),
-		CanonicalDomains:            GetSSHFieldDefault("CanonicalDomains"),
-		CanonicalizeFallbackLocal:   GetSSHFieldDefault("CanonicalizeFallbackLocal"),
-		CanonicalizeMaxDots:         GetSSHFieldDefault("CanonicalizeMaxDots"),
-		CanonicalizePermittedCNAMEs: GetSSHFieldDefault("CanonicalizePermittedCNAMEs"),
+		CanonicalizeHostname:        "",
+		CanonicalDomains:            "",
+		CanonicalizeFallbackLocal:   "",
+		CanonicalizeMaxDots:         "",
+		CanonicalizePermittedCNAMEs: "",
 
 		// Port forwarding
-		LocalForward:        GetSSHFieldDefault("LocalForward"),
-		RemoteForward:       GetSSHFieldDefault("RemoteForward"),
-		DynamicForward:      GetSSHFieldDefault("DynamicForward"),
-		ClearAllForwardings: GetSSHFieldDefault("ClearAllForwardings"),
-		GatewayPorts:        GetSSHFieldDefault("GatewayPorts"),
+		LocalForward:        "",
+		RemoteForward:       "",
+		DynamicForward:      "",
+		ClearAllForwardings: "",
+		GatewayPorts:        "",
 
 		// Authentication
-		PubkeyAuthentication:         GetSSHFieldDefault("PubkeyAuthentication"),
-		IdentitiesOnly:               GetSSHFieldDefault("IdentitiesOnly"),
-		AddKeysToAgent:               GetSSHFieldDefault("AddKeysToAgent"),
-		IdentityAgent:                GetSSHFieldDefault("IdentityAgent"),
-		PasswordAuthentication:       GetSSHFieldDefault("PasswordAuthentication"),
-		KbdInteractiveAuthentication: GetSSHFieldDefault("KbdInteractiveAuthentication"),
-		NumberOfPasswordPrompts:      GetSSHFieldDefault("NumberOfPasswordPrompts"),
-		PreferredAuthentications:     GetSSHFieldDefault("PreferredAuthentications"),
-		PubkeyAcceptedAlgorithms:     GetSSHFieldDefault("PubkeyAcceptedAlgorithms"),
-		HostbasedAcceptedAlgorithms:  GetSSHFieldDefault("HostbasedAcceptedAlgorithms"),
+		PubkeyAuthentication:         "",
+		IdentitiesOnly:               "",
+		AddKeysToAgent:               "",
+		IdentityAgent:                "",
+		PasswordAuthentication:       "",
+		KbdInteractiveAuthentication: "",
+		NumberOfPasswordPrompts:      "",
+		PreferredAuthentications:     "",
+		PubkeyAcceptedAlgorithms:     "",
+		HostbasedAcceptedAlgorithms:  "",
 
 		// Forwarding
-		ForwardAgent:      GetSSHFieldDefault("ForwardAgent"),
-		ForwardX11:        GetSSHFieldDefault("ForwardX11"),
-		ForwardX11Trusted: GetSSHFieldDefault("ForwardX11Trusted"),
+		ForwardAgent:      "",
+		ForwardX11:        "",
+		ForwardX11Trusted: "",
 
 		// Multiplexing
-		ControlMaster:  GetSSHFieldDefault("ControlMaster"),
-		ControlPath:    GetSSHFieldDefault("ControlPath"),
-		ControlPersist: GetSSHFieldDefault("ControlPersist"),
+		ControlMaster:  "",
+		ControlPath:    "",
+		ControlPersist: "",
 
 		// Keep-alive
-		ServerAliveInterval: GetSSHFieldDefault("ServerAliveInterval"),
-		ServerAliveCountMax: GetSSHFieldDefault("ServerAliveCountMax"),
-		TCPKeepAlive:        GetSSHFieldDefault("TCPKeepAlive"),
+		ServerAliveInterval: "",
+		ServerAliveCountMax: "",
+		TCPKeepAlive:        "",
 
 		// Connection
-		Compression: GetSSHFieldDefault("Compression"),
-		BatchMode:   GetSSHFieldDefault("BatchMode"),
+		Compression: "",
+		BatchMode:   "",
 
 		// Security
-		StrictHostKeyChecking: GetSSHFieldDefault("StrictHostKeyChecking"),
-		CheckHostIP:           GetSSHFieldDefault("CheckHostIP"),
-		FingerprintHash:       GetSSHFieldDefault("FingerprintHash"),
-		UserKnownHostsFile:    GetSSHFieldDefault("UserKnownHostsFile"),
-		HostKeyAlgorithms:     GetSSHFieldDefault("HostKeyAlgorithms"),
-		MACs:                  GetSSHFieldDefault("MACs"),
-		Ciphers:               GetSSHFieldDefault("Ciphers"),
-		KexAlgorithms:         GetSSHFieldDefault("KexAlgorithms"),
-		VerifyHostKeyDNS:      GetSSHFieldDefault("VerifyHostKeyDNS"),
-		UpdateHostKeys:        GetSSHFieldDefault("UpdateHostKeys"),
-		HashKnownHosts:        GetSSHFieldDefault("HashKnownHosts"),
-		VisualHostKey:         GetSSHFieldDefault("VisualHostKey"),
+		StrictHostKeyChecking: "",
+		CheckHostIP:           "",
+		FingerprintHash:       "",
+		UserKnownHostsFile:    "",
+		HostKeyAlgorithms:     "",
+		MACs:                  "",
+		Ciphers:               "",
+		KexAlgorithms:         "",
+		VerifyHostKeyDNS:      "",
+		UpdateHostKeys:        "",
+		HashKnownHosts:        "",
+		VisualHostKey:         "",
 
 		// Command execution
-		LocalCommand:       GetSSHFieldDefault("LocalCommand"),
-		PermitLocalCommand: GetSSHFieldDefault("PermitLocalCommand"),
-		EscapeChar:         GetSSHFieldDefault("EscapeChar"),
+		LocalCommand:       "",
+		PermitLocalCommand: "",
+		EscapeChar:         "",
 
 		// Environment
-		SendEnv: GetSSHFieldDefault("SendEnv"),
-		SetEnv:  GetSSHFieldDefault("SetEnv"),
+		SendEnv: "",
+		SetEnv:  "",
 
 		// Debugging
-		LogLevel: GetSSHFieldDefault("LogLevel"),
+		LogLevel: "",
 	}
 }
 

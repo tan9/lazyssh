@@ -48,7 +48,7 @@ func (sd *ServerDetails) build() {
 // renderTagChips builds colored tag chips for details view.
 func renderTagChips(tags []string) string {
 	if len(tags) == 0 {
-		return "-"
+		return ""
 	}
 	chips := make([]string, 0, len(tags))
 	for _, t := range tags {
@@ -71,9 +71,20 @@ func (sd *ServerDetails) UpdateServer(server domain.Server) {
 	tagsText := renderTagChips(server.Tags)
 
 	// Basic information
+	aliasText := strings.Join(server.Aliases, ", ")
+
+	userText := server.User
+
+	hostText := server.Host
+
+	portText := fmt.Sprintf("%d", server.Port)
+	if server.Port == 0 {
+		portText = ""
+	}
+
 	text := fmt.Sprintf(
-		"[::b]%s[-]\n\n[::b]Basic Settings:[-]\n  Host: [white]%s[-]\n  User: [white]%s[-]\n  Port: [white]%d[-]\n  Key:  [white]%s[-]\n  Tags: %s\n  Pinned: [white]%s[-]\n  Last SSH: %s\n  SSH Count: [white]%d[-]\n",
-		strings.Join(server.Aliases, ", "), server.Host, server.User, server.Port,
+		"[::b]%s[-]\n\n[::b]Basic Settings:[-]\n  Host: [white]%s[-]\n  User: [white]%s[-]\n  Port: [white]%s[-]\n  Key:  [white]%s[-]\n  Tags: %s\n  Pinned: [white]%s[-]\n  Last SSH: %s\n  SSH Count: [white]%d[-]\n",
+		aliasText, hostText, userText, portText,
 		serverKey, tagsText, pinnedStr,
 		lastSeen, server.SSHCount)
 
