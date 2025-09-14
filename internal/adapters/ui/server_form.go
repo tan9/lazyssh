@@ -16,10 +16,8 @@ package ui
 
 import (
 	"fmt"
-	"net"
 	"os"
 	"reflect"
-	"regexp"
 	"strconv"
 	"strings"
 
@@ -115,17 +113,19 @@ type ServerForm struct {
 	app         *tview.Application // Reference to app for showing modals
 	version     string             // Version for header
 	commit      string             // Commit for header
+	validation  *ValidationState   // Validation state for all fields
 }
 
 func NewServerForm(mode ServerFormMode, original *domain.Server) *ServerForm {
 	form := &ServerForm{
-		Flex:      tview.NewFlex().SetDirection(tview.FlexRow),
-		formPanel: tview.NewFlex().SetDirection(tview.FlexRow),
-		pages:     tview.NewPages(),
-		tabBar:    tview.NewTextView().SetDynamicColors(true).SetTextAlign(tview.AlignCenter).SetRegions(true),
-		forms:     make(map[string]*tview.Form),
-		mode:      mode,
-		original:  original,
+		Flex:       tview.NewFlex().SetDirection(tview.FlexRow),
+		formPanel:  tview.NewFlex().SetDirection(tview.FlexRow),
+		pages:      tview.NewPages(),
+		tabBar:     tview.NewTextView().SetDynamicColors(true).SetTextAlign(tview.AlignCenter).SetRegions(true),
+		forms:      make(map[string]*tview.Form),
+		mode:       mode,
+		original:   original,
+		validation: NewValidationState(),
 		tabs: []string{
 			"Basic",
 			"Connection",
@@ -729,6 +729,121 @@ func (sf *ServerForm) createAlgorithmAutocomplete(suggestions []string) func(str
 	}
 }
 
+// validateField validates a single field and updates the validation state
+func (sf *ServerForm) validateField(fieldName, value string) string {
+	fieldValidators := GetFieldValidators()
+	validator, exists := fieldValidators[fieldName]
+	if !exists {
+		// No validator for this field, it's valid
+		sf.validation.SetError(fieldName, "")
+		return ""
+	}
+
+	// Check required
+	if validator.Required && strings.TrimSpace(value) == "" {
+		err := fmt.Sprintf("%s is required", fieldName)
+		sf.validation.SetError(fieldName, err)
+		return err
+	}
+
+	// If field is empty and not required, it's valid
+	if value == "" {
+		sf.validation.SetError(fieldName, "")
+		return ""
+	}
+
+	// Check custom validation function
+	if validator.Validate != nil {
+		if err := validator.Validate(value); err != nil {
+			sf.validation.SetError(fieldName, err.Error())
+			return err.Error()
+		}
+	}
+
+	// Check regex pattern
+	if validator.Pattern != nil && !validator.Pattern.MatchString(value) {
+		sf.validation.SetError(fieldName, validator.Message)
+		return validator.Message
+	}
+
+	// Field is valid
+	sf.validation.SetError(fieldName, "")
+	return ""
+}
+
+// addValidatedInputField adds an input field with real-time validation
+func (sf *ServerForm) addValidatedInputField(form *tview.Form, label, fieldName, defaultValue string, width int, placeholder string) *tview.InputField {
+	// Store the original label without color tags
+	originalLabel := label
+
+	field := tview.NewInputField().
+		SetLabel(label).
+		SetText(defaultValue).
+		SetFieldWidth(width)
+
+	if placeholder != "" {
+		field.SetPlaceholder(placeholder)
+	}
+
+	// Add change handler for real-time validation
+	field.SetChangedFunc(func(text string) {
+		if err := sf.validateField(fieldName, text); err != "" {
+			// Show error in the label with red color
+			field.SetLabel(fmt.Sprintf("[red]%s[-]", originalLabel))
+		} else {
+			// Clear error indication, restore original label
+			field.SetLabel(originalLabel)
+		}
+	})
+
+	// Validate on blur (when field loses focus)
+	field.SetFinishedFunc(func(key tcell.Key) {
+		sf.validateField(fieldName, field.GetText())
+	})
+
+	form.AddFormItem(field)
+	return field
+}
+
+// validateAllFields validates all fields in the current form
+func (sf *ServerForm) validateAllFields() bool {
+	// Clear all previous errors first
+	sf.validation = NewValidationState()
+
+	data := sf.getFormData()
+
+	// Validate each field based on form data
+	// Don't return early - validate all fields
+	sf.validateField("Alias", data.Alias)
+	sf.validateField("Host", data.Host)
+	sf.validateField("Port", data.Port)
+	sf.validateField("User", data.User)
+	sf.validateField("Keys", data.Key)
+	sf.validateField("Tags", data.Tags)
+
+	// Connection fields
+	sf.validateField("ConnectTimeout", data.ConnectTimeout)
+	sf.validateField("ConnectionAttempts", data.ConnectionAttempts)
+	sf.validateField("ServerAliveInterval", data.ServerAliveInterval)
+	sf.validateField("ServerAliveCountMax", data.ServerAliveCountMax)
+	sf.validateField("IPQoS", data.IPQoS)
+	sf.validateField("BindAddress", data.BindAddress)
+
+	// Port forwarding fields
+	sf.validateField("LocalForward", data.LocalForward)
+	sf.validateField("RemoteForward", data.RemoteForward)
+	sf.validateField("DynamicForward", data.DynamicForward)
+
+	// Authentication fields
+	sf.validateField("NumberOfPasswordPrompts", data.NumberOfPasswordPrompts)
+
+	// Advanced fields
+	sf.validateField("CanonicalizeMaxDots", data.CanonicalizeMaxDots)
+	sf.validateField("EscapeChar", data.EscapeChar)
+
+	return !sf.validation.HasErrors()
+}
+
 // getDefaultValues returns default form values based on mode
 func (sf *ServerForm) getDefaultValues() ServerFormData {
 	if sf.mode == ServerFormEdit && sf.original != nil {
@@ -825,9 +940,11 @@ func (sf *ServerForm) getDefaultValues() ServerFormData {
 	}
 
 	return ServerFormData{
-		User: "root",
-		Port: "22",
-		Key:  defaultKey,
+		Alias: "", // Explicitly empty for new servers
+		Host:  "", // Explicitly empty for new servers
+		User:  "root",
+		Port:  "22",
+		Key:   defaultKey,
 	}
 }
 
@@ -836,39 +953,21 @@ func (sf *ServerForm) createBasicForm() {
 	form := tview.NewForm()
 	defaultValues := sf.getDefaultValues()
 
-	form.AddInputField("Alias:", defaultValues.Alias, 20, nil, nil)
-	form.AddInputField("Host/IP:", defaultValues.Host, 20, nil, nil)
+	// Add validated input fields
+	sf.addValidatedInputField(form, "Alias:", "Alias", defaultValues.Alias, 20, "")
+	sf.addValidatedInputField(form, "Host/IP:", "Host", defaultValues.Host, 20, "")
+	sf.addValidatedInputField(form, "User:", "User", defaultValues.User, 20, "default: root")
+	sf.addValidatedInputField(form, "Port:", "Port", defaultValues.Port, 20, "default: 22")
 
-	userField := tview.NewInputField().
-		SetLabel("User:").
-		SetText(defaultValues.User).
-		SetFieldWidth(20).
-		SetPlaceholder("default: root")
-	form.AddFormItem(userField)
-
-	portField := tview.NewInputField().
-		SetLabel("Port:").
-		SetText(defaultValues.Port).
-		SetFieldWidth(20).
-		SetPlaceholder("default: 22")
-	form.AddFormItem(portField)
-	keysField := tview.NewInputField().
-		SetLabel("Keys:").
-		SetText(defaultValues.Key).
-		SetFieldWidth(40).
-		SetPlaceholder("e.g., ~/.ssh/id_rsa, ~/.ssh/id_ed25519")
+	// Keys field with autocomplete
+	keysField := sf.addValidatedInputField(form, "Keys:", "Keys", defaultValues.Key, 40, "e.g., ~/.ssh/id_rsa, ~/.ssh/id_ed25519")
 	keysField.SetAutocompleteFunc(sf.createSSHKeyAutocomplete())
-	form.AddFormItem(keysField)
 
-	tagsField := tview.NewInputField().
-		SetLabel("Tags:").
-		SetText(defaultValues.Tags).
-		SetFieldWidth(30).
-		SetPlaceholder("comma-separated tags")
-	form.AddFormItem(tagsField)
+	// Tags field
+	sf.addValidatedInputField(form, "Tags:", "Tags", defaultValues.Tags, 30, "comma-separated tags")
 
 	// Add save and cancel buttons
-	form.AddButton("Save", sf.handleSaveWrapper)
+	form.AddButton("Save", sf.handleSaveButton)
 	form.AddButton("Cancel", sf.handleCancel)
 
 	// Set up form-level input capture for shortcuts
@@ -886,12 +985,7 @@ func (sf *ServerForm) createConnectionForm() {
 	form.AddTextView("\n[yellow]▶ Proxy & Command[-]", "", 0, 1, true, false)
 	form.AddInputField("ProxyJump:", defaultValues.ProxyJump, 40, nil, nil)
 	form.AddInputField("ProxyCommand:", defaultValues.ProxyCommand, 40, nil, nil)
-	remoteCommandField := tview.NewInputField().
-		SetLabel("RemoteCommand:").
-		SetText(defaultValues.RemoteCommand).
-		SetFieldWidth(40).
-		SetPlaceholder("command to run, or 'none' to clear (OpenSSH 7.6+)")
-	form.AddFormItem(remoteCommandField)
+	form.AddInputField("RemoteCommand:", defaultValues.RemoteCommand, 40, nil, nil)
 
 	// RequestTTY dropdown
 	requestTTYOptions := createOptionsWithDefault("RequestTTY", []string{"", "yes", "no", "force", "auto"})
@@ -904,27 +998,9 @@ func (sf *ServerForm) createConnectionForm() {
 	form.AddDropDown("SessionType:", sessionTypeOptions, sessionTypeIndex, nil)
 
 	form.AddTextView("\n[yellow]▶ Connection Settings[-]", "", 0, 1, true, false)
-	connectTimeoutField := tview.NewInputField().
-		SetLabel("ConnectTimeout:").
-		SetText(defaultValues.ConnectTimeout).
-		SetFieldWidth(10).
-		SetPlaceholder("seconds (default: none)")
-	form.AddFormItem(connectTimeoutField)
-
-	connectionAttemptsField := tview.NewInputField().
-		SetLabel("ConnectionAttempts:").
-		SetText(defaultValues.ConnectionAttempts).
-		SetFieldWidth(10).
-		SetPlaceholder("default: 1")
-	form.AddFormItem(connectionAttemptsField)
-
-	// IPQoS field (moved from Bind Options)
-	ipqosField := tview.NewInputField().
-		SetLabel("IPQoS:").
-		SetText(defaultValues.IPQoS).
-		SetFieldWidth(20).
-		SetPlaceholder("default: af21 cs1")
-	form.AddFormItem(ipqosField)
+	sf.addValidatedInputField(form, "ConnectTimeout:", "ConnectTimeout", defaultValues.ConnectTimeout, 10, "seconds (default: none)")
+	sf.addValidatedInputField(form, "ConnectionAttempts:", "ConnectionAttempts", defaultValues.ConnectionAttempts, 10, "default: 1")
+	sf.addValidatedInputField(form, "IPQoS:", "IPQoS", defaultValues.IPQoS, 20, "default: af21 cs1")
 
 	// BatchMode dropdown (moved from Keep-Alive)
 	batchModeOptions := createOptionsWithDefault("BatchMode", []string{"", "yes", "no"})
@@ -932,7 +1008,7 @@ func (sf *ServerForm) createConnectionForm() {
 	form.AddDropDown("BatchMode:", batchModeOptions, batchModeIndex, nil)
 
 	form.AddTextView("\n[yellow]▶ Bind Options[-]", "", 0, 1, true, false)
-	form.AddInputField("BindAddress:", defaultValues.BindAddress, 40, nil, nil)
+	sf.addValidatedInputField(form, "BindAddress:", "BindAddress", defaultValues.BindAddress, 40, "IP, hostname, * (all), or localhost")
 
 	// BindInterface dropdown with available network interfaces
 	interfaceOptions := append([]string{""}, GetNetworkInterfaces()...)
@@ -963,12 +1039,7 @@ func (sf *ServerForm) createConnectionForm() {
 	fallbackIndex := sf.findOptionIndex(fallbackOptions, defaultValues.CanonicalizeFallbackLocal)
 	form.AddDropDown("CanonicalizeFallbackLocal:", fallbackOptions, fallbackIndex, nil)
 
-	canonicalizeMaxDotsField := tview.NewInputField().
-		SetLabel("CanonicalizeMaxDots:").
-		SetText(defaultValues.CanonicalizeMaxDots).
-		SetFieldWidth(10).
-		SetPlaceholder("default: 1")
-	form.AddFormItem(canonicalizeMaxDotsField)
+	sf.addValidatedInputField(form, "CanonicalizeMaxDots:", "CanonicalizeMaxDots", defaultValues.CanonicalizeMaxDots, 10, "default: 1")
 
 	canonicalizePermittedCNAMEsField := tview.NewInputField().
 		SetLabel("CanonicalizePermittedCNAMEs:").
@@ -978,19 +1049,8 @@ func (sf *ServerForm) createConnectionForm() {
 	form.AddFormItem(canonicalizePermittedCNAMEsField)
 
 	form.AddTextView("\n[yellow]▶ Keep-Alive[-]", "", 0, 1, true, false)
-	serverAliveIntervalField := tview.NewInputField().
-		SetLabel("ServerAliveInterval:").
-		SetText(defaultValues.ServerAliveInterval).
-		SetFieldWidth(10).
-		SetPlaceholder("seconds (default: 0)")
-	form.AddFormItem(serverAliveIntervalField)
-
-	serverAliveCountMaxField := tview.NewInputField().
-		SetLabel("ServerAliveCountMax:").
-		SetText(defaultValues.ServerAliveCountMax).
-		SetFieldWidth(10).
-		SetPlaceholder("default: 3")
-	form.AddFormItem(serverAliveCountMaxField)
+	sf.addValidatedInputField(form, "ServerAliveInterval:", "ServerAliveInterval", defaultValues.ServerAliveInterval, 10, "seconds (default: 0)")
+	sf.addValidatedInputField(form, "ServerAliveCountMax:", "ServerAliveCountMax", defaultValues.ServerAliveCountMax, 10, "default: 3")
 
 	// Compression dropdown
 	compressionOptions := createOptionsWithDefault("Compression", []string{"", "yes", "no"})
@@ -1011,7 +1071,7 @@ func (sf *ServerForm) createConnectionForm() {
 	form.AddInputField("ControlPersist:", defaultValues.ControlPersist, 20, nil, nil)
 
 	// Add save and cancel buttons
-	form.AddButton("Save", sf.handleSaveWrapper)
+	form.AddButton("Save", sf.handleSaveButton)
 	form.AddButton("Cancel", sf.handleCancel)
 
 	// Set up form-level input capture for shortcuts
@@ -1027,26 +1087,9 @@ func (sf *ServerForm) createForwardingForm() {
 	defaultValues := sf.getDefaultValues()
 
 	form.AddTextView("\n[yellow]▶ Port Forwarding[-]", "", 0, 1, true, false)
-	localForwardField := tview.NewInputField().
-		SetLabel("LocalForward:").
-		SetText(defaultValues.LocalForward).
-		SetFieldWidth(40).
-		SetPlaceholder("e.g., 8080:localhost:80, 3000:localhost:3000")
-	form.AddFormItem(localForwardField)
-
-	remoteForwardField := tview.NewInputField().
-		SetLabel("RemoteForward:").
-		SetText(defaultValues.RemoteForward).
-		SetFieldWidth(40).
-		SetPlaceholder("e.g., 80:localhost:8080")
-	form.AddFormItem(remoteForwardField)
-
-	dynamicForwardField := tview.NewInputField().
-		SetLabel("DynamicForward:").
-		SetText(defaultValues.DynamicForward).
-		SetFieldWidth(40).
-		SetPlaceholder("e.g., 1080, 1081")
-	form.AddFormItem(dynamicForwardField)
+	sf.addValidatedInputField(form, "LocalForward:", "LocalForward", defaultValues.LocalForward, 40, "e.g., 8080:localhost:80, 3000:localhost:3000")
+	sf.addValidatedInputField(form, "RemoteForward:", "RemoteForward", defaultValues.RemoteForward, 40, "e.g., 80:localhost:8080")
+	sf.addValidatedInputField(form, "DynamicForward:", "DynamicForward", defaultValues.DynamicForward, 40, "e.g., 1080, 1081")
 
 	// ClearAllForwardings dropdown
 	clearAllForwardingsOptions := createOptionsWithDefault("ClearAllForwardings", []string{"", "yes", "no"})
@@ -1081,7 +1124,7 @@ func (sf *ServerForm) createForwardingForm() {
 	form.AddDropDown("ForwardX11Trusted:", forwardX11TrustedOptions, forwardX11TrustedIndex, nil)
 
 	// Add save and cancel buttons
-	form.AddButton("Save", sf.handleSaveWrapper)
+	form.AddButton("Save", sf.handleSaveButton)
 	form.AddButton("Cancel", sf.handleCancel)
 
 	// Set up form-level input capture for shortcuts
@@ -1194,12 +1237,7 @@ func (sf *ServerForm) createAuthenticationForm() {
 	form.AddDropDown("KbdInteractiveAuthentication:", kbdInteractiveOptions, kbdInteractiveIndex, nil)
 
 	// NumberOfPasswordPrompts field
-	passwordPromptsField := tview.NewInputField().
-		SetLabel("NumberOfPasswordPrompts:").
-		SetText(defaultValues.NumberOfPasswordPrompts).
-		SetFieldWidth(10).
-		SetPlaceholder("default: 3")
-	form.AddFormItem(passwordPromptsField)
+	sf.addValidatedInputField(form, "NumberOfPasswordPrompts:", "NumberOfPasswordPrompts", defaultValues.NumberOfPasswordPrompts, 10, "default: 3")
 
 	// Advanced: Authentication order preference
 	form.AddTextView("\n[yellow]▶ Advanced[-]", "", 0, 1, true, false)
@@ -1230,7 +1268,7 @@ func (sf *ServerForm) createAuthenticationForm() {
 	form.AddFormItem(hostbasedAlgField)
 
 	// Add save and cancel buttons
-	form.AddButton("Save", sf.handleSaveWrapper)
+	form.AddButton("Save", sf.handleSaveButton)
 	form.AddButton("Cancel", sf.handleCancel)
 
 	// Set up form-level input capture for shortcuts
@@ -1331,12 +1369,7 @@ func (sf *ServerForm) createAdvancedForm() {
 	form.AddDropDown("PermitLocalCommand:", permitLocalCommandOptions, permitLocalCommandIndex, nil)
 
 	// EscapeChar input field
-	escapeCharField := tview.NewInputField().
-		SetLabel("EscapeChar:").
-		SetText(defaultValues.EscapeChar).
-		SetFieldWidth(10).
-		SetPlaceholder("default: ~")
-	form.AddFormItem(escapeCharField)
+	sf.addValidatedInputField(form, "EscapeChar:", "EscapeChar", defaultValues.EscapeChar, 10, "default: ~")
 
 	form.AddTextView("\n[yellow]▶ Environment[-]", "", 0, 1, true, false)
 	sendEnvField := tview.NewInputField().
@@ -1361,7 +1394,7 @@ func (sf *ServerForm) createAdvancedForm() {
 	form.AddDropDown("LogLevel:", logLevelOptions, logLevelIndex, nil)
 
 	// Add save and cancel buttons
-	form.AddButton("Save", sf.handleSaveWrapper)
+	form.AddButton("Save", sf.handleSaveButton)
 	form.AddButton("Cancel", sf.handleCancel)
 
 	// Set up form-level input capture for shortcuts
@@ -1466,6 +1499,8 @@ type ServerFormData struct {
 	LogLevel string
 }
 
+// stripColorTags removes tview color tags from a string
+// e.g., "[red]Port:[-]" becomes "Port:"
 func (sf *ServerForm) getFormData() ServerFormData {
 	// Helper function to get text from InputField across all forms
 	getFieldText := func(fieldName string) string {
@@ -1473,7 +1508,10 @@ func (sf *ServerForm) getFormData() ServerFormData {
 			for i := 0; i < form.GetFormItemCount(); i++ {
 				if field, ok := form.GetFormItem(i).(*tview.InputField); ok {
 					label := strings.TrimSpace(field.GetLabel())
-					if strings.HasPrefix(label, fieldName) {
+					// Strip color tags from label for comparison
+					// Labels can be: "Port:", "[red]Port:[-]", "[green]Port:[-]"
+					cleanLabel := stripColorTags(label)
+					if strings.HasPrefix(cleanLabel, fieldName) {
 						return strings.TrimSpace(field.GetText())
 					}
 				}
@@ -1488,7 +1526,9 @@ func (sf *ServerForm) getFormData() ServerFormData {
 			for i := 0; i < form.GetFormItemCount(); i++ {
 				if dropdown, ok := form.GetFormItem(i).(*tview.DropDown); ok {
 					label := strings.TrimSpace(dropdown.GetLabel())
-					if strings.HasPrefix(label, fieldName) {
+					// Strip color tags from label for comparison
+					cleanLabel := stripColorTags(label)
+					if strings.HasPrefix(cleanLabel, fieldName) {
 						_, text := dropdown.GetCurrentOption()
 						// Parse the option value to handle "default (value)" format
 						return parseOptionValue(text)
@@ -1594,17 +1634,69 @@ func (sf *ServerForm) parseSessionType(value string) string {
 	}
 }
 
-func (sf *ServerForm) handleSave() bool {
-	data := sf.getFormData()
+// handleSaveButton is a wrapper for button callback (no return value)
+func (sf *ServerForm) handleSaveButton() {
+	sf.handleSave()
+}
 
-	if errMsg := validateServerForm(data); errMsg != "" {
-		// Show error in form panel title bar
-		sf.formPanel.SetTitle(fmt.Sprintf("%s — [red::b]%s[-]", sf.titleForMode(), errMsg))
-		sf.formPanel.SetBorderColor(tcell.ColorRed)
+// handleSave validates and saves the form, returns true if successful
+func (sf *ServerForm) handleSave() bool {
+	// First validate all fields with the new validation system
+	if !sf.validateAllFields() {
+		// Show validation errors
+		if sf.app != nil {
+			errors := sf.validation.GetAllErrors()
+			if len(errors) > 0 {
+				// Limit the number of errors to display to prevent overflow
+				maxErrorsToShow := 5
+				truncated := false
+				if len(errors) > maxErrorsToShow {
+					errors = errors[:maxErrorsToShow]
+					truncated = true
+				}
+
+				// Build error message
+				errorMsg := fmt.Sprintf("Validation failed (%d error%s):\n\n",
+					sf.validation.GetErrorCount(),
+					func() string {
+						if sf.validation.GetErrorCount() == 1 {
+							return ""
+						}
+						return "s"
+					}())
+
+				for i, err := range errors {
+					errorMsg += fmt.Sprintf("%d. %s\n", i+1, err)
+				}
+
+				if truncated {
+					errorMsg += fmt.Sprintf("\n... and %d more error%s",
+						sf.validation.GetErrorCount()-maxErrorsToShow,
+						func() string {
+							if sf.validation.GetErrorCount()-maxErrorsToShow == 1 {
+								return ""
+							}
+							return "s"
+						}())
+				}
+
+				// Use tview's built-in Modal
+				modal := tview.NewModal().
+					SetText(errorMsg).
+					AddButtons([]string{"OK"}).
+					SetDoneFunc(func(buttonIndex int, buttonLabel string) {
+						sf.app.SetRoot(sf.Flex, true)
+					})
+
+				sf.app.SetRoot(modal, true)
+			}
+		}
 		return false // Validation failed
 	}
 
-	// Reset title and border on success
+	data := sf.getFormData()
+
+	// Reset title and border (validation already done above)
 	sf.formPanel.SetTitle(sf.titleForMode())
 	sf.formPanel.SetBorderColor(tcell.Color238)
 
@@ -1613,11 +1705,6 @@ func (sf *ServerForm) handleSave() bool {
 		sf.onSave(server, sf.original)
 	}
 	return true // Save successful
-}
-
-// handleSaveWrapper is used for button callbacks that don't need return value
-func (sf *ServerForm) handleSaveWrapper() {
-	sf.handleSave()
 }
 
 func (sf *ServerForm) handleCancel() {
@@ -1935,51 +2022,6 @@ func (sf *ServerForm) dataToServer(data ServerFormData) domain.Server {
 	}
 
 	return server
-}
-
-// validateServerForm returns an error message string if validation fails; empty string means valid.
-func validateServerForm(data ServerFormData) string {
-	alias := data.Alias
-	if alias == "" {
-		return "Alias is required"
-	}
-	if !regexp.MustCompile(`^[A-Za-z0-9_.-]+$`).MatchString(alias) {
-		return "Alias may contain letters, digits, dot, dash, underscore"
-	}
-
-	host := data.Host
-	if host == "" {
-		return "Host/IP is required"
-	}
-	if ip := net.ParseIP(host); ip == nil {
-
-		if strings.Contains(host, " ") {
-			return "Host must not contain spaces"
-		}
-		if !regexp.MustCompile(`^[A-Za-z0-9.-]+$`).MatchString(host) {
-			return "Host contains invalid characters"
-		}
-		if strings.HasPrefix(host, ".") || strings.HasSuffix(host, ".") {
-			return "Host must not start or end with a dot"
-		}
-		for _, lbl := range strings.Split(host, ".") {
-			if lbl == "" {
-				return "Host must not contain empty labels"
-			}
-			if strings.HasPrefix(lbl, "-") || strings.HasSuffix(lbl, "-") {
-				return "Hostname labels must not start or end with a hyphen"
-			}
-		}
-	}
-
-	if data.Port != "" {
-		p, err := strconv.Atoi(data.Port)
-		if err != nil || p < 1 || p > 65535 {
-			return "Port must be a number between 1 and 65535"
-		}
-	}
-
-	return ""
 }
 
 func (sf *ServerForm) OnSave(fn func(domain.Server, *domain.Server)) *ServerForm {
