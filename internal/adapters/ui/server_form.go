@@ -442,12 +442,19 @@ func (sf *ServerForm) updateTabBar() {
 
 func (sf *ServerForm) switchToTab(tabName string) {
 	for _, tab := range sf.tabs {
-		if tab == tabName {
-			sf.currentTab = tabName
-			sf.pages.SwitchToPage(tabName)
-			sf.updateTabBar()
-			break
+		if tab != tabName {
+			continue
 		}
+
+		sf.currentTab = tabName
+		sf.pages.SwitchToPage(tabName)
+		sf.updateTabBar()
+
+		// Set focus to the form in the newly selected tab
+		if form, exists := sf.forms[tabName]; exists && sf.app != nil {
+			sf.app.SetFocus(form)
+		}
+		break
 	}
 }
 
