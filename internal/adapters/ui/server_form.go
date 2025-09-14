@@ -1057,6 +1057,9 @@ func (sf *ServerForm) validateAllFields() bool {
 	sf.validateField("CanonicalizeMaxDots", data.CanonicalizeMaxDots)
 	sf.validateField("EscapeChar", data.EscapeChar)
 
+	// Security fields
+	sf.validateField("UserKnownHostsFile", data.UserKnownHostsFile)
+
 	return !sf.validation.HasErrors()
 }
 
@@ -1598,8 +1601,8 @@ func (sf *ServerForm) createAdvancedForm() {
 	visualHostKeyIndex := sf.findOptionIndex(visualHostKeyOptions, defaultValues.VisualHostKey)
 	sf.addDropDownWithHelp(form, "VisualHostKey:", "VisualHostKey", visualHostKeyOptions, visualHostKeyIndex)
 
-	// UserKnownHostsFile field with autocomplete
-	knownHostsField := sf.addInputFieldWithHelp(form, "UserKnownHostsFile:", "UserKnownHostsFile", defaultValues.UserKnownHostsFile, 40, GetFieldPlaceholder("UserKnownHostsFile"))
+	// UserKnownHostsFile field with autocomplete and validation
+	knownHostsField := sf.addValidatedInputField(form, "UserKnownHostsFile:", "UserKnownHostsFile", defaultValues.UserKnownHostsFile, 40, GetFieldPlaceholder("UserKnownHostsFile"))
 	knownHostsField.SetAutocompleteFunc(sf.createKnownHostsAutocomplete())
 
 	form.AddTextView("\n[yellow]▶ Cryptography[-]", "", 0, 1, true, false)

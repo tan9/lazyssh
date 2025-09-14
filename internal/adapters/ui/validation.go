@@ -17,6 +17,8 @@ package ui
 import (
 	"fmt"
 	"net"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -154,7 +156,7 @@ func GetFieldValidators() map[string]fieldValidator {
 	}
 	validators["Keys"] = fieldValidator{
 		Validate: validateKeyPaths,
-		Message:  "Key path contains invalid characters",
+		Message:  "Key file not found or not accessible",
 	}
 
 	// Connection fields
@@ -215,6 +217,12 @@ func GetFieldValidators() map[string]fieldValidator {
 	validators["EscapeChar"] = fieldValidator{
 		Validate: validateEscapeChar,
 		Message:  "EscapeChar must be a single character, 'none', or ^X format (e.g., ^A)",
+	}
+
+	// Security fields
+	validators["UserKnownHostsFile"] = fieldValidator{
+		Validate: validateKnownHostsFiles,
+		Message:  "Known hosts file not found or not accessible",
 	}
 
 	return validators
@@ -327,23 +335,117 @@ func validateIPQoS(value string) error {
 	return nil
 }
 
-// validateKeyPaths validates SSH key file paths
-func validateKeyPaths(keys string) error {
-	if keys == "" {
+// validateFilePath validates a single file path for existence and readability
+func validateFilePath(path string) (exists bool, accessible bool, isDir bool) {
+	// Get home directory for tilde expansion
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		homeDir = ""
+	}
+
+	// Expand tilde notation
+	expandedPath := path
+	if strings.HasPrefix(path, "~/") && homeDir != "" {
+		expandedPath = filepath.Join(homeDir, path[2:])
+	} else if strings.HasPrefix(path, "~") && homeDir != "" {
+		// Handle ~ alone
+		expandedPath = homeDir
+	}
+
+	// Check if file exists
+	info, err := os.Stat(expandedPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return false, false, false // File doesn't exist
+		}
+		// Permission denied or other error
+		return true, false, false // File exists but not accessible
+	}
+
+	// Check if it's a directory
+	if info.IsDir() {
+		return true, true, true
+	}
+
+	// Check if file is readable
+	// #nosec G304 - expandedPath is validated user input
+	file, err := os.Open(expandedPath)
+	if err != nil {
+		return true, false, false // File exists but not readable
+	}
+	_ = file.Close()
+
+	return true, true, false // File exists and is readable
+}
+
+// buildFileValidationError builds an error message from invalid and inaccessible file paths
+func buildFileValidationError(invalidPaths, inaccessiblePaths []string) error {
+	var errors []string
+	if len(invalidPaths) > 0 {
+		errors = append(errors, fmt.Sprintf("file(s) not found: %s", strings.Join(invalidPaths, ", ")))
+	}
+	if len(inaccessiblePaths) > 0 {
+		errors = append(errors, fmt.Sprintf("file(s) not accessible: %s", strings.Join(inaccessiblePaths, ", ")))
+	}
+
+	if len(errors) > 0 {
+		return fmt.Errorf("%s", strings.Join(errors, "; "))
+	}
+	return nil
+}
+
+// validateFilePaths validates multiple file paths with a custom separator
+func validateFilePaths(files string, separator string) error {
+	if files == "" {
 		return nil
 	}
 	// Check for invalid characters first, before trimming
-	if strings.ContainsAny(keys, "\n\r\t") {
-		return fmt.Errorf("key path contains invalid characters")
+	if strings.ContainsAny(files, "\n\r\t") {
+		return fmt.Errorf("file path contains invalid characters")
 	}
-	paths := strings.Split(keys, ",")
+
+	var paths []string
+	if separator == " " {
+		// For space separator, use Fields to handle multiple spaces
+		paths = strings.Fields(files)
+	} else {
+		// For other separators like comma
+		paths = strings.Split(files, separator)
+	}
+
+	var invalidPaths []string
+	var inaccessiblePaths []string
+
 	for _, path := range paths {
 		path = strings.TrimSpace(path)
 		if path == "" {
 			continue
 		}
+
+		exists, accessible, isDir := validateFilePath(path)
+
+		switch {
+		case !exists:
+			invalidPaths = append(invalidPaths, path)
+		case isDir:
+			invalidPaths = append(invalidPaths, fmt.Sprintf("%s (is a directory)", path))
+		case !accessible:
+			inaccessiblePaths = append(inaccessiblePaths, path)
+		}
 	}
-	return nil
+
+	return buildFileValidationError(invalidPaths, inaccessiblePaths)
+}
+
+// validateKeyPaths validates SSH key file paths (comma-separated)
+func validateKeyPaths(keys string) error {
+	return validateFilePaths(keys, ",")
+}
+
+// validateKnownHostsFiles validates known_hosts file paths (space-separated)
+func validateKnownHostsFiles(files string) error {
+	// Empty is valid - SSH will use default
+	return validateFilePaths(files, " ")
 }
 
 // validateHost validates a hostname or IP address
