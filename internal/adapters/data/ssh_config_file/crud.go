@@ -122,10 +122,12 @@ func (r *Repository) createHostFromServer(server domain.Server) *ssh_config.Host
 
 	// Port forwarding
 	for _, forward := range server.LocalForward {
-		r.addKVNodeIfNotEmpty(host, "LocalForward", forward)
+		configFormat := r.convertCLIForwardToConfigFormat(forward)
+		r.addKVNodeIfNotEmpty(host, "LocalForward", configFormat)
 	}
 	for _, forward := range server.RemoteForward {
-		r.addKVNodeIfNotEmpty(host, "RemoteForward", forward)
+		configFormat := r.convertCLIForwardToConfigFormat(forward)
+		r.addKVNodeIfNotEmpty(host, "RemoteForward", configFormat)
 	}
 	for _, forward := range server.DynamicForward {
 		r.addKVNodeIfNotEmpty(host, "DynamicForward", forward)
@@ -306,12 +308,14 @@ func (r *Repository) updateHostNodes(host *ssh_config.Host, newServer domain.Ser
 
 	host.Nodes = removeNodesByKey(host.Nodes, "LocalForward")
 	for _, forward := range newServer.LocalForward {
-		r.addKVNodeIfNotEmpty(host, "LocalForward", forward)
+		configFormat := r.convertCLIForwardToConfigFormat(forward)
+		r.addKVNodeIfNotEmpty(host, "LocalForward", configFormat)
 	}
 
 	host.Nodes = removeNodesByKey(host.Nodes, "RemoteForward")
 	for _, forward := range newServer.RemoteForward {
-		r.addKVNodeIfNotEmpty(host, "RemoteForward", forward)
+		configFormat := r.convertCLIForwardToConfigFormat(forward)
+		r.addKVNodeIfNotEmpty(host, "RemoteForward", configFormat)
 	}
 
 	host.Nodes = removeNodesByKey(host.Nodes, "DynamicForward")
@@ -440,6 +444,79 @@ func (r *Repository) getProperKeyCase(key string) string {
 		return properCase
 	}
 	return key
+}
+
+// convertCLIForwardToConfigFormat converts CLI format forwarding spec to SSH config format.
+// CLI format: [bind_address:]port:host:hostport
+// Config format: [bind_address:]port host:hostport
+func (r *Repository) convertCLIForwardToConfigFormat(forward string) string {
+	// Handle IPv6 addresses in brackets like [2001:db8::1]
+	// These should be treated as a single unit
+
+	// Find the last `:digits` that represents the final port
+	lastPortStart := -1
+	for i := len(forward) - 1; i >= 0; i-- {
+		if forward[i] == ':' {
+			// Check if everything after this colon is digits
+			if i+1 < len(forward) {
+				allDigits := true
+				hasDigits := false
+				for j := i + 1; j < len(forward); j++ {
+					if forward[j] >= '0' && forward[j] <= '9' {
+						hasDigits = true
+					} else {
+						allDigits = false
+						break
+					}
+				}
+				if allDigits && hasDigits {
+					lastPortStart = i
+					break
+				}
+			}
+		}
+	}
+
+	if lastPortStart == -1 {
+		// No port at the end, return as-is
+		return forward
+	}
+
+	// Now find the split point between local and remote parts
+	// We need to handle bracket-enclosed addresses specially
+	inBrackets := 0
+	for i := lastPortStart - 1; i >= 0; i-- {
+		switch forward[i] {
+		case ']':
+			inBrackets++
+		case '[':
+			inBrackets--
+		case ':':
+			if inBrackets != 0 {
+				continue
+			}
+			// This colon is not inside brackets
+			// Check if this looks like it could be the split point
+			// The split point would be after a port number (digits after a colon)
+
+			// Look ahead to see what comes after this colon
+			nextChar := byte(' ')
+			if i+1 < len(forward) {
+				nextChar = forward[i+1]
+			}
+
+			// If the next character could be start of a host (letter, digit, bracket)
+			// then this is our split point
+			if nextChar != ':' {
+				localPart := forward[:i]
+				remotePart := forward[i+1:]
+				return localPart + " " + remotePart
+			}
+		}
+	}
+
+	// If no split point found, return as-is
+	return forward
 }
 
 // removeHostByAlias removes a host by its alias from the list of hosts.

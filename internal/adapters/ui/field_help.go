@@ -201,7 +201,7 @@ var fieldHelpData = map[string]FieldHelp{
 	"LocalForward": {
 		Field:       "LocalForward",
 		Description: "Forward a local port to a remote address. Useful for accessing remote services through SSH tunnel.",
-		Syntax:      "[bind_address:]port:host:hostport",
+		Syntax:      "[bind_address:]port:host:hostport (CLI format, auto-converted for config file)",
 		Examples:    []string{"8080:localhost:80", "3306:db.internal:3306", "*:8080:localhost:80"},
 		Default:     "none",
 		Category:    "Forwarding",
@@ -209,7 +209,7 @@ var fieldHelpData = map[string]FieldHelp{
 	"RemoteForward": {
 		Field:       "RemoteForward",
 		Description: "Forward a remote port to a local address. Allows remote users to access local services.",
-		Syntax:      "[bind_address:]port:host:hostport",
+		Syntax:      "[bind_address:]port:host:hostport (CLI format, auto-converted for config file)",
 		Examples:    []string{"8080:localhost:3000", "*:80:localhost:8080"},
 		Default:     "none",
 		Category:    "Forwarding",

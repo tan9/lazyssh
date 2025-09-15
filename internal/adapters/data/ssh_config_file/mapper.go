@@ -173,9 +173,11 @@ func (r *Repository) mapConnectionConfig(server *domain.Server, key, value strin
 func (r *Repository) mapForwardingConfig(server *domain.Server, key, value string) bool {
 	switch key {
 	case "localforward":
-		server.LocalForward = append(server.LocalForward, value)
+		cliFormat := r.convertConfigForwardToCLIFormat(value)
+		server.LocalForward = append(server.LocalForward, cliFormat)
 	case "remoteforward":
-		server.RemoteForward = append(server.RemoteForward, value)
+		cliFormat := r.convertConfigForwardToCLIFormat(value)
+		server.RemoteForward = append(server.RemoteForward, cliFormat)
 	case "dynamicforward":
 		server.DynamicForward = append(server.DynamicForward, value)
 	case "clearallforwardings":
@@ -312,4 +314,20 @@ func (r *Repository) mergeMetadata(servers []domain.Server, metadata map[string]
 		}
 	}
 	return servers
+}
+
+// convertConfigForwardToCLIFormat converts SSH config format forwarding spec to CLI format.
+// Config format: [bind_address:]port host:hostport
+// CLI format: [bind_address:]port:host:hostport
+func (r *Repository) convertConfigForwardToCLIFormat(forward string) string {
+	// Find the last space which separates the local part from the remote part
+	lastSpace := strings.LastIndex(forward, " ")
+	if lastSpace != -1 {
+		localPart := forward[:lastSpace]
+		remotePart := forward[lastSpace+1:]
+		// Join them with a colon for CLI format
+		return localPart + ":" + remotePart
+	}
+	// If no space found, return as-is (might already be in CLI format)
+	return forward
 }
