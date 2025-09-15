@@ -61,6 +61,8 @@ func TestValidatePortForward(t *testing.T) {
 		{"Invalid format - too many parts", "127.0.0.1:8080:localhost:80:extra", true},
 		{"Invalid port number", "abc:localhost:80", true},
 		{"Port out of range", "70000:localhost:80", true},
+		{"Invalid bind address - malformed IP", "127.0.0.0.0.0.1:8080:localhost:80", true},
+		{"Invalid bind address - IP out of range", "192.168.1.256:8080:localhost:80", true},
 	}
 
 	for _, tt := range tests {
@@ -116,6 +118,9 @@ func TestValidateBindAddress(t *testing.T) {
 		{"Address ending with dot", "example.com.", true},
 		{"Address starting with hyphen", "-example.com", true},
 		{"Address ending with hyphen", "example-.com", true},
+		{"Invalid IP-like address", "127.0.0.0.0.0.1", true},
+		{"Invalid numeric hostname", "192.168.1.256", true},
+		{"Multiple dots", "example..com", true},
 	}
 
 	for _, tt := range tests {

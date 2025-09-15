@@ -634,6 +634,16 @@ func validateBindAddress(address string) error {
 	return validateBindHostname(address)
 }
 
+// isNumericDottedFormat checks if the address looks like an IP address (contains only dots and digits)
+func isNumericDottedFormat(address string) bool {
+	for _, ch := range address {
+		if ch != '.' && (ch < '0' || ch > '9') {
+			return false
+		}
+	}
+	return strings.Contains(address, ".")
+}
+
 // validateBindHostname validates a hostname for bind address (more permissive than regular hostname)
 func validateBindHostname(address string) error {
 	// Check for invalid characters using a single check
@@ -648,6 +658,32 @@ func validateBindHostname(address string) error {
 
 	if strings.HasPrefix(address, "-") || strings.HasSuffix(address, "-") {
 		return fmt.Errorf("address cannot start or end with hyphen")
+	}
+
+	// Check for consecutive dots
+	if strings.Contains(address, "..") {
+		return fmt.Errorf("address cannot contain consecutive dots")
+	}
+
+	// If it looks like an IP address (contains only dots and digits), validate it more strictly
+	if isNumericDottedFormat(address) {
+		// Check if all segments are valid numbers
+		segments := strings.Split(address, ".")
+		// IPv4 should have exactly 4 segments
+		if len(segments) == 4 {
+			for _, seg := range segments {
+				if seg == "" {
+					return fmt.Errorf("invalid IP address format")
+				}
+				num, err := strconv.Atoi(seg)
+				if err != nil || num < 0 || num > 255 {
+					return fmt.Errorf("invalid IP address format")
+				}
+			}
+			return nil // Valid IPv4
+		}
+		// If it's not 4 segments but looks numeric, it's invalid
+		return fmt.Errorf("invalid address format")
 	}
 
 	// Check each label for hyphens at start/end
