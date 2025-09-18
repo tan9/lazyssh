@@ -105,7 +105,7 @@ func (r *Repository) createHostFromServer(server domain.Server) *ssh_config.Host
 	// Basic config - always present
 	r.addKVNodeIfNotEmpty(host, "HostName", server.Host)
 	r.addKVNodeIfNotEmpty(host, "User", server.User)
-	if server.Port != 22 && server.Port != 0 {
+	if server.Port != 0 {
 		r.addKVNodeIfNotEmpty(host, "Port", fmt.Sprintf("%d", server.Port))
 	}
 	for _, identityFile := range server.IdentityFiles {
@@ -218,9 +218,9 @@ func removeNodesByKey(nodes []ssh_config.Node, key string) []ssh_config.Node {
 
 // updateHostNodes updates the nodes of an existing host with new server details.
 func (r *Repository) updateHostNodes(host *ssh_config.Host, newServer domain.Server) {
-	// Handle Port specially - don't include if it's the default (22)
+	// Handle Port - include if explicitly set (even if it's 22)
 	portValue := ""
-	if newServer.Port != 22 && newServer.Port != 0 {
+	if newServer.Port != 0 {
 		portValue = fmt.Sprintf("%d", newServer.Port)
 	}
 
