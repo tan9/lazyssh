@@ -183,6 +183,8 @@ func (t *tui) handleServerSelectionChange(server domain.Server) {
 
 func (t *tui) handleServerAdd() {
 	form := NewServerForm(ServerFormAdd, nil).
+		SetApp(t.app).
+		SetVersionInfo(t.version, t.commit).
 		OnSave(t.handleServerSave).
 		OnCancel(t.handleFormCancel)
 	t.app.SetRoot(form, true)
@@ -191,6 +193,8 @@ func (t *tui) handleServerAdd() {
 func (t *tui) handleServerEdit() {
 	if server, ok := t.serverList.GetSelectedServer(); ok {
 		form := NewServerForm(ServerFormEdit, &server).
+			SetApp(t.app).
+			SetVersionInfo(t.version, t.commit).
 			OnSave(t.handleServerSave).
 			OnCancel(t.handleFormCancel)
 		t.app.SetRoot(form, true)
@@ -308,7 +312,7 @@ func (t *tui) showDeleteConfirmModal(server domain.Server) {
 
 	modal := tview.NewModal().
 		SetText(msg).
-		AddButtons([]string{"Cancel", "Confirm"}).
+		AddButtons([]string{"[yellow]C[-]ancel", "[yellow]D[-]elete"}).
 		SetDoneFunc(func(buttonIndex int, buttonLabel string) {
 			if buttonIndex == 1 {
 				_ = t.serverService.DeleteServer(server)
@@ -317,14 +321,32 @@ func (t *tui) showDeleteConfirmModal(server domain.Server) {
 			t.handleModalClose()
 		})
 
+	// Add keyboard shortcuts for the modal
+	modal.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		switch event.Rune() {
+		case 'c', 'C':
+			// Cancel
+			t.handleModalClose()
+			return nil
+		case 'd', 'D':
+			// Delete
+			_ = t.serverService.DeleteServer(server)
+			t.refreshServerList()
+			t.handleModalClose()
+			return nil
+		}
+		// ESC key already handled by default modal behavior
+		return event
+	})
+
 	t.app.SetRoot(modal, true)
 }
 
 func (t *tui) showEditTagsForm(server domain.Server) {
 	form := tview.NewForm()
 	form.SetBorder(true).
-		SetTitle(fmt.Sprintf("Edit Tags: %s", server.Alias)).
-		SetTitleAlign(tview.AlignLeft)
+		SetTitle(fmt.Sprintf(" Edit Tags: %s ", server.Alias)).
+		SetTitleAlign(tview.AlignCenter)
 
 	defaultTags := strings.Join(server.Tags, ", ")
 	form.AddInputField("Tags (comma):", defaultTags, 40, nil, nil)

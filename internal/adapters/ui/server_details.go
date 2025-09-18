@@ -39,7 +39,8 @@ func (sd *ServerDetails) build() {
 	sd.TextView.SetDynamicColors(true).
 		SetWrap(true).
 		SetBorder(true).
-		SetTitle("Details").
+		SetTitle(" Details ").
+		SetTitleAlign(tview.AlignCenter).
 		SetBorderColor(tcell.Color238).
 		SetTitleColor(tcell.Color250)
 }
@@ -47,7 +48,7 @@ func (sd *ServerDetails) build() {
 // renderTagChips builds colored tag chips for details view.
 func renderTagChips(tags []string) string {
 	if len(tags) == 0 {
-		return "-"
+		return ""
 	}
 	chips := make([]string, 0, len(tags))
 	for _, t := range tags {
@@ -68,11 +69,152 @@ func (sd *ServerDetails) UpdateServer(server domain.Server) {
 		pinnedStr = "false"
 	}
 	tagsText := renderTagChips(server.Tags)
+
+	// Basic information
+	aliasText := strings.Join(server.Aliases, ", ")
+
+	userText := server.User
+
+	hostText := server.Host
+
+	portText := fmt.Sprintf("%d", server.Port)
+	if server.Port == 0 {
+		portText = ""
+	}
+
 	text := fmt.Sprintf(
-		"[::b]%s[-]\n\nHost: [white]%s[-]\nUser: [white]%s[-]\nPort: [white]%d[-]\nKey:  [white]%s[-]\nTags: %s\nPinned: [white]%s[-]\nLast SSH: %s\nSSH Count: [white]%d[-]\n\n[::b]Commands:[-]\n  Enter: SSH connect\n  c: Copy SSH command\n  g: Ping server\n  r: Refresh list\n  a: Add new server\n  e: Edit entry\n  t: Edit tags\n  d: Delete entry\n  p: Pin/Unpin",
-		strings.Join(server.Aliases, ", "), server.Host, server.User, server.Port,
+		"[::b]%s[-]\n\n[::b]Basic Settings:[-]\n  Host: [white]%s[-]\n  User: [white]%s[-]\n  Port: [white]%s[-]\n  Key:  [white]%s[-]\n  Tags: %s\n  Pinned: [white]%s[-]\n  Last SSH: %s\n  SSH Count: [white]%d[-]\n",
+		aliasText, hostText, userText, portText,
 		serverKey, tagsText, pinnedStr,
 		lastSeen, server.SSHCount)
+
+	// Advanced settings section (only show non-empty fields)
+	// Organized by logical grouping for better readability
+	type fieldEntry struct {
+		name  string
+		value string
+	}
+
+	type fieldGroup struct {
+		name   string
+		fields []fieldEntry
+	}
+
+	// Create field groups for better organization and future extensibility
+	groups := []fieldGroup{
+		{
+			name: "Connection & Proxy",
+			fields: []fieldEntry{
+				{"ProxyJump", server.ProxyJump},
+				{"ProxyCommand", server.ProxyCommand},
+				{"RemoteCommand", server.RemoteCommand},
+				{"RequestTTY", server.RequestTTY},
+				{"SessionType", server.SessionType},
+				{"ConnectTimeout", server.ConnectTimeout},
+				{"ConnectionAttempts", server.ConnectionAttempts},
+				{"BindAddress", server.BindAddress},
+				{"BindInterface", server.BindInterface},
+				{"AddressFamily", server.AddressFamily},
+				{"ExitOnForwardFailure", server.ExitOnForwardFailure},
+				{"IPQoS", server.IPQoS},
+				{"CanonicalizeHostname", server.CanonicalizeHostname},
+				{"CanonicalDomains", server.CanonicalDomains},
+				{"CanonicalizeFallbackLocal", server.CanonicalizeFallbackLocal},
+				{"CanonicalizeMaxDots", server.CanonicalizeMaxDots},
+				{"CanonicalizePermittedCNAMEs", server.CanonicalizePermittedCNAMEs},
+				{"ServerAliveInterval", server.ServerAliveInterval},
+				{"ServerAliveCountMax", server.ServerAliveCountMax},
+				{"Compression", server.Compression},
+				{"TCPKeepAlive", server.TCPKeepAlive},
+				{"BatchMode", server.BatchMode},
+				{"ControlMaster", server.ControlMaster},
+				{"ControlPath", server.ControlPath},
+				{"ControlPersist", server.ControlPersist},
+			},
+		},
+		{
+			name: "Authentication",
+			fields: []fieldEntry{
+				{"PubkeyAuthentication", server.PubkeyAuthentication},
+				{"PubkeyAcceptedAlgorithms", server.PubkeyAcceptedAlgorithms},
+				{"HostbasedAcceptedAlgorithms", server.HostbasedAcceptedAlgorithms},
+				{"PasswordAuthentication", server.PasswordAuthentication},
+				{"PreferredAuthentications", server.PreferredAuthentications},
+				{"IdentitiesOnly", server.IdentitiesOnly},
+				{"AddKeysToAgent", server.AddKeysToAgent},
+				{"IdentityAgent", server.IdentityAgent},
+				{"KbdInteractiveAuthentication", server.KbdInteractiveAuthentication},
+				{"NumberOfPasswordPrompts", server.NumberOfPasswordPrompts},
+			},
+		},
+		{
+			name: "Forwarding",
+			fields: []fieldEntry{
+				{"ForwardAgent", server.ForwardAgent},
+				{"ForwardX11", server.ForwardX11},
+				{"ForwardX11Trusted", server.ForwardX11Trusted},
+				{"LocalForward", strings.Join(server.LocalForward, ", ")},
+				{"RemoteForward", strings.Join(server.RemoteForward, ", ")},
+				{"DynamicForward", strings.Join(server.DynamicForward, ", ")},
+				{"ClearAllForwardings", server.ClearAllForwardings},
+				{"GatewayPorts", server.GatewayPorts},
+			},
+		},
+		{
+			name: "Security & Cryptography",
+			fields: []fieldEntry{
+				{"StrictHostKeyChecking", server.StrictHostKeyChecking},
+				{"CheckHostIP", server.CheckHostIP},
+				{"FingerprintHash", server.FingerprintHash},
+				{"UserKnownHostsFile", server.UserKnownHostsFile},
+				{"HostKeyAlgorithms", server.HostKeyAlgorithms},
+				{"Ciphers", server.Ciphers},
+				{"MACs", server.MACs},
+				{"KexAlgorithms", server.KexAlgorithms},
+				{"VerifyHostKeyDNS", server.VerifyHostKeyDNS},
+				{"UpdateHostKeys", server.UpdateHostKeys},
+				{"HashKnownHosts", server.HashKnownHosts},
+				{"VisualHostKey", server.VisualHostKey},
+			},
+		},
+		{
+			name: "Environment & Execution",
+			fields: []fieldEntry{
+				{"LocalCommand", server.LocalCommand},
+				{"PermitLocalCommand", server.PermitLocalCommand},
+				{"EscapeChar", server.EscapeChar},
+				{"SendEnv", strings.Join(server.SendEnv, ", ")},
+				{"SetEnv", strings.Join(server.SetEnv, ", ")},
+			},
+		},
+		{
+			name: "Debugging",
+			fields: []fieldEntry{
+				{"LogLevel", server.LogLevel},
+			},
+		},
+	}
+
+	// Build advanced settings text without group labels for cleaner display
+	hasAdvanced := false
+	advancedText := "\n[::b]Advanced Settings:[-]\n"
+
+	for _, group := range groups {
+		for _, field := range group.fields {
+			if field.value != "" {
+				hasAdvanced = true
+				advancedText += fmt.Sprintf("  %s: [white]%s[-]\n", field.name, field.value)
+			}
+		}
+	}
+
+	if hasAdvanced {
+		text += advancedText
+	}
+
+	// Commands list
+	text += "\n[::b]Commands:[-]\n  Enter: SSH connect\n  c: Copy SSH command\n  g: Ping server\n  r: Refresh list\n  a: Add new server\n  e: Edit entry\n  t: Edit tags\n  d: Delete entry\n  p: Pin/Unpin"
+
 	sd.TextView.SetText(text)
 }
 

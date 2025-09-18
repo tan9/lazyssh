@@ -141,6 +141,6 @@ func (t *tui) loadInitialData() *tui {
 
 func (t *tui) updateListTitle() {
 	if t.serverList != nil {
-		t.serverList.SetTitle("Servers — Sort: " + t.sortMode.String())
+		t.serverList.SetTitle(" Servers — Sort: " + t.sortMode.String() + " ")
 	}
 }
