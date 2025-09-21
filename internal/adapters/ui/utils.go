@@ -89,7 +89,7 @@ func formatServerLine(s domain.Server, width int) (primary, secondary string) {
 	pingIndicator := ""
 	if s.PingStatus != "" {
 		switch s.PingStatus {
-		case "up":
+		case statusUp:
 			if s.PingLatency > 0 {
 				ms := s.PingLatency.Milliseconds()
 				var statusText string
@@ -106,9 +106,9 @@ func formatServerLine(s domain.Server, width int) (primary, secondary string) {
 			} else {
 				pingIndicator = "[#4AF626]● UP  [-]"
 			}
-		case "down":
+		case statusDown:
 			pingIndicator = "[#FF6B6B]● DOWN[-]"
-		case "checking":
+		case statusChecking:
 			pingIndicator = "[#FFB86C]● ... [-]"
 		}
 	}
@@ -133,11 +133,11 @@ func formatServerLine(s domain.Server, width int) (primary, secondary string) {
 			// Medium screen: show only dot
 			simplePingIndicator := ""
 			switch s.PingStatus {
-			case "up":
+			case statusUp:
 				simplePingIndicator = "[#4AF626]●[-]"
-			case "down":
+			case statusDown:
 				simplePingIndicator = "[#FF6B6B]●[-]"
-			case "checking":
+			case statusChecking:
 				simplePingIndicator = "[#FFB86C]●[-]"
 			}
 			paddingLen := width - mainTextLen - 1 // 1 for dot, no margin

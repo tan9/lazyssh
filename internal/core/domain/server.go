@@ -24,11 +24,11 @@ type Server struct {
 	Port          int
 	IdentityFiles []string
 	Tags          []string
-	LastSeen      time.Time
-	PinnedAt      time.Time
-	SSHCount      int
-	PingStatus    string        // "up", "down", "checking", or ""
-	PingLatency   time.Duration // ping latency
+	LastSeen      time.Time     `lazyssh:"metadata"`
+	PinnedAt      time.Time     `lazyssh:"metadata"`
+	SSHCount      int           `lazyssh:"metadata"`
+	PingStatus    string        `lazyssh:"transient"` // "up", "down", "checking", or ""
+	PingLatency   time.Duration `lazyssh:"transient"` // ping latency
 
 	// Additional SSH config fields
 	// Connection and proxy settings
